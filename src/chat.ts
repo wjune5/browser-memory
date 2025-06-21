@@ -24,7 +24,7 @@ export class ChatManager {
     this.chatMessages = document.getElementById("chatMessages") as HTMLDivElement;
     this.chatInput = document.getElementById("chatInput") as HTMLInputElement;
     this.sendBtn = document.getElementById("sendBtn") as HTMLButtonElement;
-    this.clearChatBtn = document.getElementById("clearChat") as HTMLButtonElement;
+    this.clearChatBtn = document.getElementById("newChatBtn") as HTMLButtonElement;
   }
 
   // Set up event listeners
@@ -124,15 +124,15 @@ export class ChatManager {
     return responses[randomIndex] || "I'm here to help! What would you like to know?";
   }
 
-  // Clear chat history
+  // Clear chat history (start new chat)
   clearChat(): void {
-    if (confirm("Are you sure you want to clear the chat history?")) {
+    if (confirm("Start a new chat? This will clear the current conversation.")) {
       this.chatHistory = [];
       if (this.chatMessages) {
         this.chatMessages.innerHTML = "";
       }
       this.initializeChat(); // Add welcome message back
-      this.updateStatus("Chat cleared");
+      this.updateStatus("New chat started");
     }
   }
 
