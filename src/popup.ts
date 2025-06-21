@@ -60,6 +60,9 @@ apiKeyInput.addEventListener("change", handleApiKeyChange);
 // Infinite scroll listener
 memoryList.addEventListener("scroll", handleScroll);
 
+// Event delegation for memory URL clicks
+memoryList.addEventListener("click", handleMemoryClick);
+
 // Infinite scroll handler
 async function handleScroll(): Promise<void> {
   if (isLoading) return;
@@ -429,20 +432,25 @@ function displayMemories(memories: Memory[]): void {
 
   memoryList.innerHTML = memories
     .map(
-      (memory) => `
-        <div class="memory-item" data-id="${memory.id}">
+      (memory) => `        <div class="memory-item" data-id="${memory.id}">
             <div style="font-weight: bold; margin-bottom: 4px;">${escapeHtml(
               memory.title
             )}</div>
             <div style="font-size: 11px; color: #666; margin-bottom: 4px;">
                 ${new Date(memory.timestamp).toLocaleDateString()}
             </div>
-            <div style="font-size: 12px; color: #888;">
-                ${escapeHtml(
-                  memory.url.length > 50
-                    ? memory.url.substring(0, 50) + "..."
-                    : memory.url
-                )}
+            <div style="font-size: 12px;">
+                <a href="#" class="memory-url" data-url="${escapeHtml(
+                  memory.url
+                )}" 
+                   style="color: #1a73e8; text-decoration: none; cursor: pointer;"
+                   title="${escapeHtml(memory.url)}">
+                    ${escapeHtml(
+                      memory.url.length > 50
+                        ? memory.url.substring(0, 50) + "..."
+                        : memory.url
+                    )}
+                </a>
             </div>
         </div>
     `
@@ -466,20 +474,25 @@ function appendSearchResults(results: SearchResult[]): void {
 function appendMemories(memories: Memory[]): void {
   const memoryHTML = memories
     .map(
-      (memory) => `
-        <div class="memory-item" data-id="${memory.id}">
+      (memory) => `        <div class="memory-item" data-id="${memory.id}">
             <div style="font-weight: bold; margin-bottom: 4px;">${escapeHtml(
               memory.title
             )}</div>
             <div style="font-size: 11px; color: #666; margin-bottom: 4px;">
                 ${new Date(memory.timestamp).toLocaleDateString()}
             </div>
-            <div style="font-size: 12px; color: #888;">
-                ${escapeHtml(
-                  memory.url.length > 50
-                    ? memory.url.substring(0, 50) + "..."
-                    : memory.url
-                )}
+            <div style="font-size: 12px;">
+                <a href="#" class="memory-url" data-url="${escapeHtml(
+                  memory.url
+                )}" 
+                   style="color: #1a73e8; text-decoration: none; cursor: pointer;"
+                   title="${escapeHtml(memory.url)}">
+                    ${escapeHtml(
+                      memory.url.length > 50
+                        ? memory.url.substring(0, 50) + "..."
+                        : memory.url
+                    )}
+                </a>
             </div>
         </div>
     `
@@ -561,4 +574,29 @@ function escapeHtml(text: string): string {
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
+}
+
+// Handle clicks on memory items (specifically URL links)
+async function handleMemoryClick(event: Event): Promise<void> {
+  const target = event.target as HTMLElement;
+
+  // Check if the clicked element is a memory URL link
+  if (target.classList.contains("memory-url")) {
+    event.preventDefault();
+
+    const url = target.getAttribute("data-url");
+    if (url) {
+      try {
+        // Open the URL in a new tab
+        await chrome.tabs.create({ url: url });
+        updateStatus("Opening page...");
+
+        // Clear status after 2 seconds
+        setTimeout(() => updateStatus("Ready"), 2000);
+      } catch (error) {
+        console.error("Error opening URL:", error);
+        updateStatus("Failed to open page");
+      }
+    }
+  }
 }

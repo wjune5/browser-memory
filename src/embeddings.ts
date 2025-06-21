@@ -89,15 +89,23 @@ export class EmbeddingsService {
 
   // Generate embeddings for text
   async generateEmbedding(text: string): Promise<number[]> {
-    switch (this.config.model) {
-      case "openai":
-        return this.generateOpenAIEmbedding(text);
-      case "local":
-        return this.generateLocalEmbedding(text);
-      case "cohere":
-        return this.generateCohereEmbedding(text);
-      default:
-        throw new Error(`Unsupported embedding model: ${this.config.model}`);
+    console.log("🤖 Generating embedding using model:", this.config.model);
+    console.log("📝 Text length:", text.length, "characters");
+
+    try {
+      switch (this.config.model) {
+        case "openai":
+          return this.generateOpenAIEmbedding(text);
+        case "local":
+          return this.generateLocalEmbedding(text);
+        case "cohere":
+          return this.generateCohereEmbedding(text);
+        default:
+          throw new Error(`Unsupported embedding model: ${this.config.model}`);
+      }
+    } catch (error) {
+      console.error("❌ Embedding generation failed:", error);
+      throw error;
     }
   }
 
@@ -182,7 +190,13 @@ export class EmbeddingsService {
 
   // Calculate cosine similarity between embeddings
   cosineSimilarity(a: number[], b: number[]): number {
-    if (a.length !== b.length) return 0;
+    if (a.length !== b.length) {
+      console.warn("⚠️  Embedding dimension mismatch:", {
+        aLength: a.length,
+        bLength: b.length
+      });
+      return 0;
+    }
 
     let dotProduct = 0;
     let normA = 0;
@@ -195,7 +209,19 @@ export class EmbeddingsService {
     }
 
     const magnitude = Math.sqrt(normA) * Math.sqrt(normB);
-    return magnitude > 0 ? dotProduct / magnitude : 0;
+    const similarity = magnitude > 0 ? dotProduct / magnitude : 0;
+
+    // Only log high similarities to avoid noise
+    if (similarity > 0.05) {
+      console.log("🔗 Cosine similarity calculated:", {
+        similarity: similarity.toFixed(4),
+        dotProduct: dotProduct.toFixed(4),
+        magnitudeA: Math.sqrt(normA).toFixed(4),
+        magnitudeB: Math.sqrt(normB).toFixed(4)
+      });
+    }
+
+    return similarity;
   }
 
   // Search memories by semantic similarity
@@ -204,35 +230,114 @@ export class EmbeddingsService {
     memories: Memory[],
     limit: number = 10
   ): Promise<SemanticSearchResult[]> {
+    console.log("🔍 Starting semantic search with query:", query);
+    console.log("📊 Processing", memories.length, "memories");
+
+    try {
+      const queryEmbedding = await this.generateEmbedding(query);
+      console.log(
+        "✅ Query embedding generated, dimensions:",
+        queryEmbedding.length
+      );
+      console.log(
+        "🔢 Query embedding sample (first 5 values):",
+        queryEmbedding.slice(0, 5)
+      );
+    } catch (error) {
+      console.error("❌ Failed to generate query embedding:", error);
+      return [];
+    }
+
     const queryEmbedding = await this.generateEmbedding(query);
     const results: SemanticSearchResult[] = [];
+    let memoriesWithEmbeddings = 0;
+    let memoriesProcessed = 0;
 
     for (const memory of memories) {
-      if (!memory.embedding) continue;
+      memoriesProcessed++;
+
+      if (!memory.embedding) {
+        console.log(
+          `⚠️  Memory ${memoriesProcessed} has no embedding, skipping:`,
+          {
+            url: memory.url,
+            title: memory.title?.substring(0, 50) + "..."
+          }
+        );
+        continue;
+      }
+
+      memoriesWithEmbeddings++;
+      console.log(
+        `🧮 Processing memory ${memoriesProcessed} with embedding dimensions:`,
+        memory.embedding.length
+      );
 
       const similarity = this.cosineSimilarity(
         queryEmbedding,
         memory.embedding!
       );
 
+      console.log(`📈 Similarity score for memory ${memoriesProcessed}:`, {
+        similarity: similarity.toFixed(4),
+        title: memory.title?.substring(0, 50) + "...",
+        url: memory.url,
+        passesThreshold: similarity > 0.1
+      });
+
       if (similarity > 0.1) {
         // Similarity threshold
+        const matchedChunks =
+          memory.chunks?.filter((chunk) => {
+            if (!chunk.embedding) return false;
+            const chunkSimilarity = this.cosineSimilarity(
+              queryEmbedding,
+              chunk.embedding!
+            );
+            console.log(
+              `  🧩 Chunk similarity: ${chunkSimilarity.toFixed(4)} (passes: ${
+                chunkSimilarity > 0.15
+              })`
+            );
+            return chunkSimilarity > 0.15;
+          }) || [];
+
+        console.log(
+          `✅ Adding memory to results with ${matchedChunks.length} matched chunks`
+        );
+
         results.push({
           ...memory,
           similarity,
-          matchedChunks:
-            memory.chunks?.filter((chunk) => {
-              if (!chunk.embedding) return false;
-              return (
-                this.cosineSimilarity(queryEmbedding, chunk.embedding!) > 0.15
-              );
-            }) || []
+          matchedChunks
         });
       }
     }
 
+    console.log("📋 Search summary:", {
+      totalMemories: memories.length,
+      memoriesWithEmbeddings,
+      memoriesProcessed,
+      resultsFound: results.length,
+      threshold: 0.1
+    });
+
     // Sort by similarity and return top results
-    return results.sort((a, b) => b.similarity - a.similarity).slice(0, limit);
+    const sortedResults = results
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, limit);
+
+    console.log(
+      "🎯 Final results:",
+      sortedResults.map((r) => ({
+        similarity: r.similarity.toFixed(4),
+        title: r.title?.substring(0, 50) + "...",
+        url: r.url,
+        matchedChunks: r.matchedChunks?.length || 0
+      }))
+    );
+
+    return sortedResults;
   }
 
   // Simple hash function for local embeddings
