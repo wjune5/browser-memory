@@ -1,5 +1,6 @@
 /// <reference types="chrome"/>
-import type { Memory, SearchResult } from "./types/memory";
+import { EmbeddingsService, EmbeddingsStorage } from "./embeddings";
+import type { EmbeddingConfig, Memory, SearchResult } from "./types/memory";
 
 // DOM elements with proper typing
 const searchInput = document.getElementById("searchInput") as HTMLInputElement;
@@ -14,6 +15,7 @@ const clearMemoryBtn = document.getElementById(
 const autoSaveToggle = document.getElementById(
   "autoSaveToggle"
 ) as HTMLInputElement;
+const apiKeyInput = document.getElementById("apiKeyInput") as HTMLInputElement;
 const status = document.getElementById("status") as HTMLDivElement;
 
 // Initialize popup
@@ -21,6 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadRecentMemories();
   loadSettings();
   updateStatus("Ready");
+  updateStorageInfo(); // Show storage usage
 });
 
 // Event listeners
@@ -34,6 +37,7 @@ searchInput.addEventListener("keypress", (e: KeyboardEvent) => {
 saveCurrentPageBtn.addEventListener("click", saveCurrentPage);
 clearMemoryBtn.addEventListener("click", clearMemory);
 autoSaveToggle.addEventListener("change", handleAutoSaveToggle);
+apiKeyInput.addEventListener("change", handleApiKeyChange);
 
 // Search functionality
 async function handleSearch(): Promise<void> {
@@ -137,22 +141,120 @@ async function clearMemory(): Promise<void> {
 
 // Storage functions
 async function saveMemory(memory: Memory): Promise<void> {
-  const result = await chrome.storage.local.get(["memories"]);
-  const memories: Memory[] = result.memories || [];
+  try {
+    const result = await chrome.storage.local.get(["settings"]);
+    const settings = result.settings;
 
-  memories.unshift(memory);
+    // Generate embeddings for the memory
+    const embeddingConfig: EmbeddingConfig = {
+      model: settings?.apiKey ? "openai" : "local", // Use OpenAI if API key available, otherwise local
+      dimensions: settings?.apiKey ? 1536 : 384, // OpenAI: 1536, Local: 384
+      maxTokens: 500,
+      chunkOverlap: 50
+    };
 
-  // Keep only the last 100 memories
-  const trimmedMemories = memories.slice(0, 100);
+    const embeddingsService = new EmbeddingsService(embeddingConfig);
 
-  await chrome.storage.local.set({ memories: trimmedMemories });
+    // Generate embedding for the main content
+    const contentToEmbed = memory.content || memory.title || "";
+    if (contentToEmbed.trim()) {
+      try {
+        memory.embedding = await embeddingsService.generateEmbedding(
+          contentToEmbed
+        );
+
+        // If content is long, also create chunks with embeddings
+        if (contentToEmbed.length > 1000) {
+          const chunks = embeddingsService.chunkText(contentToEmbed);
+          memory.chunks = [];
+
+          for (const chunk of chunks.slice(0, 5)) {
+            // Limit to 5 chunks to save storage
+            try {
+              chunk.embedding = await embeddingsService.generateEmbedding(
+                chunk.content
+              );
+              memory.chunks.push(chunk);
+            } catch (chunkError) {
+              console.warn(
+                "Failed to generate embedding for chunk:",
+                chunkError
+              );
+              memory.chunks.push(chunk); // Store chunk without embedding
+            }
+          }
+        }
+      } catch (embeddingError) {
+        console.warn(
+          "Failed to generate embeddings, storing without embeddings:",
+          embeddingError
+        );
+      }
+    }
+
+    // Use EmbeddingsStorage to handle size limits and storage
+    await EmbeddingsStorage.storeMemoryWithEmbeddings(memory);
+  } catch (error) {
+    console.error(
+      "Error processing embeddings, falling back to simple storage:",
+      error
+    );
+    // Fallback to simple storage without embeddings
+    const result = await chrome.storage.local.get(["memories"]);
+    const memories: Memory[] = result.memories || [];
+    memories.unshift(memory);
+    const trimmedMemories = memories.slice(0, 100);
+    await chrome.storage.local.set({ memories: trimmedMemories });
+  }
 }
 
 async function searchMemories(query: string): Promise<SearchResult[]> {
-  const result = await chrome.storage.local.get(["memories"]);
+  const result = await chrome.storage.local.get(["memories", "settings"]);
   const memories: Memory[] = result.memories || [];
+  const settings = result.settings;
 
-  // Simple text search - TODO: Implement AI-powered semantic search
+  if (!query.trim()) {
+    return memories
+      .slice(0, 10)
+      .map((memory) => ({ ...memory, relevanceScore: 1 }));
+  }
+
+  // Try semantic search if embeddings are available
+  const memoriesWithEmbeddings = memories.filter(
+    (m) => m.embedding && m.embedding.length > 0
+  );
+
+  if (memoriesWithEmbeddings.length > 0) {
+    try {
+      const embeddingConfig: EmbeddingConfig = {
+        model: settings?.apiKey ? "openai" : "local",
+        dimensions: settings?.apiKey ? 1536 : 384,
+        maxTokens: 500,
+        chunkOverlap: 50
+      };
+
+      const embeddingsService = new EmbeddingsService(embeddingConfig);
+      const semanticResults = await embeddingsService.semanticSearch(
+        query,
+        memoriesWithEmbeddings,
+        10
+      );
+
+      if (semanticResults.length > 0) {
+        return semanticResults.map((result) => ({
+          ...result,
+          relevanceScore: result.similarity
+        }));
+      }
+    } catch (error) {
+      console.warn(
+        "Semantic search failed, falling back to text search:",
+        error
+      );
+    }
+  }
+
+  // Fallback to simple text search
   const lowercaseQuery = query.toLowerCase();
   return memories
     .filter(
@@ -190,6 +292,25 @@ async function loadRecentMemories(): Promise<void> {
     console.error("Load error:", error);
     memoryList.innerHTML =
       '<div class="memory-item">Failed to load memories</div>';
+  }
+}
+
+// Storage info function
+async function updateStorageInfo(): Promise<void> {
+  try {
+    const storageInfo = await EmbeddingsStorage.getStorageInfo();
+    const usedKB = Math.round(storageInfo.used / 1024);
+    const totalKB = Math.round(storageInfo.total / 1024);
+    const percentage = Math.round((storageInfo.used / storageInfo.total) * 100);
+
+    console.log(`Storage: ${usedKB}KB / ${totalKB}KB (${percentage}%)`);
+
+    // Update status with storage info if usage is high
+    if (percentage > 80) {
+      updateStatus(`Storage: ${percentage}% full (${usedKB}KB used)`);
+    }
+  } catch (error) {
+    console.warn("Failed to get storage info:", error);
   }
 }
 
@@ -238,9 +359,11 @@ async function loadSettings(): Promise<void> {
     const result = await chrome.storage.local.get(["settings"]);
     const settings = result.settings || { autoSave: true };
     autoSaveToggle.checked = settings.autoSave;
+    apiKeyInput.value = settings.apiKey || "";
   } catch (error) {
     console.error("Error loading settings:", error);
     autoSaveToggle.checked = true; // Default to enabled
+    apiKeyInput.value = "";
   }
 }
 
@@ -262,6 +385,29 @@ async function handleAutoSaveToggle(): Promise<void> {
   } catch (error) {
     console.error("Error updating auto-save setting:", error);
     updateStatus("Failed to update settings");
+  }
+}
+
+async function handleApiKeyChange(): Promise<void> {
+  try {
+    const result = await chrome.storage.local.get(["settings"]);
+    const settings = result.settings || {};
+
+    settings.apiKey = apiKeyInput.value.trim();
+
+    await chrome.storage.local.set({ settings });
+
+    if (settings.apiKey) {
+      updateStatus("API key saved");
+    } else {
+      updateStatus("API key cleared");
+    }
+
+    // Clear status after 2 seconds
+    setTimeout(() => updateStatus("Ready"), 2000);
+  } catch (error) {
+    console.error("Error updating API key:", error);
+    updateStatus("Failed to save API key");
   }
 }
 

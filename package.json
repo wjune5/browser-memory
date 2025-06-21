@@ -10,6 +10,9 @@
     "clean": "rm -rf dist",
     "start": "npm run dev"
   },
+  "dependencies": {
+    "openai": "^4.104.0"
+  },
   "devDependencies": {
     "@types/chrome": "^0.0.268",
     "@types/node": "^20.14.8",

@@ -8,7 +8,8 @@ module.exports = (env, argv) => {
     entry: {
       popup: "./src/popup.ts",
       background: "./src/background.ts",
-      content: "./src/content.ts"
+      content: "./src/content.ts",
+      embeddings: "./src/embeddings.ts"
     },
     output: {
       path: path.resolve(__dirname, "dist"),

@@ -14,6 +14,10 @@ export interface Memory {
   metadata?: PageMetadata;
   links?: PageLink[];
   images?: PageImage[];
+  // New fields for RAG/embeddings
+  embedding?: number[];
+  chunks?: TextChunk[];
+  embeddingModel?: string; // Track which model generated embeddings
 }
 
 export interface PageMetadata {
@@ -71,6 +75,28 @@ export interface SearchResult extends Memory {
   matchedFields?: string[];
 }
 
+// New types for RAG functionality
+export interface TextChunk {
+  id: string;
+  content: string;
+  embedding?: number[];
+  startIndex: number;
+  endIndex: number;
+  tokens: number; // Approximate token count
+}
+
+export interface EmbeddingConfig {
+  model: "openai" | "local" | "cohere";
+  dimensions: number;
+  maxTokens: number;
+  chunkOverlap: number;
+}
+
+export interface SemanticSearchResult extends Memory {
+  similarity: number;
+  matchedChunks?: TextChunk[];
+}
+
 // Message types for communication between scripts
 export interface Message {
   action: string;
@@ -109,5 +135,29 @@ export interface ExtractContentResponse {
 
 export interface SearchMemoriesResponse {
   results: SearchResult[];
+  error?: string;
+}
+
+// New message types for embeddings/AI
+export interface GenerateEmbeddingMessage extends Message {
+  action: "generateEmbedding";
+  text: string;
+  model?: string;
+}
+
+export interface SemanticSearchMessage extends Message {
+  action: "semanticSearch";
+  query: string;
+  limit?: number;
+}
+
+export interface GenerateEmbeddingResponse {
+  embedding: number[];
+  model: string;
+  error?: string;
+}
+
+export interface SemanticSearchResponse {
+  results: SemanticSearchResult[];
   error?: string;
 }

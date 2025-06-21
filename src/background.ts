@@ -1,5 +1,7 @@
 /// <reference types="chrome"/>
+import { EmbeddingsService, EmbeddingsStorage } from "./embeddings";
 import type {
+  EmbeddingConfig,
   ExtensionSettings,
   ExtractContentMessage,
   Memory
@@ -198,7 +200,7 @@ async function savePageToMemory(
   }
 }
 
-// Add memory to storage
+// Add memory to storage with embeddings
 async function addMemory(memory: Memory): Promise<void> {
   const result = await chrome.storage.local.get(["memories", "settings"]);
   const memories: Memory[] = result.memories || [];
@@ -211,23 +213,111 @@ async function addMemory(memory: Memory): Promise<void> {
   );
 
   if (!isDuplicate) {
-    memories.unshift(memory);
+    try {
+      // Generate embeddings for the memory
+      const embeddingConfig: EmbeddingConfig = {
+        model: settings?.apiKey ? "openai" : "local", // Use OpenAI if API key available, otherwise local
+        dimensions: settings?.apiKey ? 1536 : 384, // OpenAI: 1536, Local: 384
+        maxTokens: 500,
+        chunkOverlap: 50
+      };
 
-    // Limit number of memories
-    const maxMemories = settings?.maxMemories || 100;
-    const trimmedMemories = memories.slice(0, maxMemories);
+      const embeddingsService = new EmbeddingsService(embeddingConfig);
 
-    await chrome.storage.local.set({ memories: trimmedMemories });
+      // Generate embedding for the main content
+      const contentToEmbed = memory.content || memory.title || "";
+      if (contentToEmbed.trim()) {
+        try {
+          memory.embedding = await embeddingsService.generateEmbedding(
+            contentToEmbed
+          );
+
+          // If content is long, also create chunks with embeddings
+          if (contentToEmbed.length > 1000) {
+            const chunks = embeddingsService.chunkText(contentToEmbed);
+            memory.chunks = [];
+
+            for (const chunk of chunks.slice(0, 5)) {
+              // Limit to 5 chunks to save storage
+              try {
+                chunk.embedding = await embeddingsService.generateEmbedding(
+                  chunk.content
+                );
+                memory.chunks.push(chunk);
+              } catch (chunkError) {
+                console.warn(
+                  "Failed to generate embedding for chunk:",
+                  chunkError
+                );
+                memory.chunks.push(chunk); // Store chunk without embedding
+              }
+            }
+          }
+        } catch (embeddingError) {
+          console.warn(
+            "Failed to generate embeddings, storing without embeddings:",
+            embeddingError
+          );
+        }
+      }
+
+      // Use EmbeddingsStorage to handle size limits and storage
+      await EmbeddingsStorage.storeMemoryWithEmbeddings(memory);
+    } catch (error) {
+      console.error(
+        "Error processing embeddings, falling back to simple storage:",
+        error
+      );
+      // Fallback to simple storage without embeddings
+      memories.unshift(memory);
+      const maxMemories = settings?.maxMemories || 100;
+      const trimmedMemories = memories.slice(0, maxMemories);
+      await chrome.storage.local.set({ memories: trimmedMemories });
+    }
   }
 }
 
-// Search memories
+// Search memories with semantic search support
 async function searchMemories(query: string): Promise<Memory[]> {
-  const result = await chrome.storage.local.get(["memories"]);
+  const result = await chrome.storage.local.get(["memories", "settings"]);
   const memories: Memory[] = result.memories || [];
+  const settings: ExtensionSettings = result.settings;
 
   if (!query) return memories.slice(0, 10);
 
+  // Try semantic search if embeddings are available
+  const memoriesWithEmbeddings = memories.filter(
+    (m) => m.embedding && m.embedding.length > 0
+  );
+
+  if (memoriesWithEmbeddings.length > 0) {
+    try {
+      const embeddingConfig: EmbeddingConfig = {
+        model: settings?.apiKey ? "openai" : "local",
+        dimensions: settings?.apiKey ? 1536 : 384,
+        maxTokens: 500,
+        chunkOverlap: 50
+      };
+
+      const embeddingsService = new EmbeddingsService(embeddingConfig);
+      const semanticResults = await embeddingsService.semanticSearch(
+        query,
+        memoriesWithEmbeddings,
+        10
+      );
+
+      if (semanticResults.length > 0) {
+        return semanticResults;
+      }
+    } catch (error) {
+      console.warn(
+        "Semantic search failed, falling back to text search:",
+        error
+      );
+    }
+  }
+
+  // Fallback to simple text search
   const lowercaseQuery = query.toLowerCase();
   const results = memories.filter(
     (memory) =>
