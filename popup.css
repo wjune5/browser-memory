@@ -117,6 +117,16 @@ main {
   margin-bottom: 0;
 }
 
+.memory-link {
+  color: #000;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.memory-link:hover {
+  color: #667eea;
+}
+
 .actions {
   display: flex;
   flex-direction: column;

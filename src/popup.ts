@@ -327,10 +327,10 @@ function displayMemories(memories: Memory[]): void {
       (memory) => `
         <div class="memory-item" data-id="${memory.id}">
             <div style="font-weight: bold; margin-bottom: 4px;">
-                <a href = ${escapeHtml(memory.url)}> 
-                ${escapeHtml(
-              memory.title
-            )}
+                <a href="${escapeHtml(
+                  memory.url
+                )}" target="_blank" class="memory-link"> 
+                ${escapeHtml(memory.title)}
                 </a>
             </div>
             <div style="font-size: 11px; color: #666; margin-bottom: 4px;">
@@ -339,7 +339,7 @@ function displayMemories(memories: Memory[]): void {
         </div>
     `
     )
-    .join(""); 
+    .join("");
 }
 
 function displaySearchResults(results: SearchResult[]): void {
