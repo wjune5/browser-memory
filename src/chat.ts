@@ -170,7 +170,7 @@ export class ChatManager {
           const relevantMemories = await this.embeddingsService.semanticSearch(
             userMessage,
             memories,
-            5 // Get top 5 most relevant memories
+            20 // Get top 5 most relevant memories
           );
 
           console.log("🔍 Found", relevantMemories.length, "relevant memories");
@@ -186,8 +186,8 @@ export class ChatManager {
               if (memory.content) {
                 // Limit content length to avoid token limits
                 const content =
-                  memory.content.length > 300
-                    ? memory.content.substring(0, 300) + "..."
+                  memory.content.length > 500
+                    ? memory.content.substring(0, 500) + "..."
                     : memory.content;
                 contextualInfo += `   Content: ${content}\n`;
               }
@@ -202,7 +202,7 @@ export class ChatManager {
             searchError
           );
           // Fallback: use recent memories if semantic search fails
-          const recentMemories = memories.slice(0, 3);
+          const recentMemories = memories.slice(0, 10);
           if (recentMemories.length > 0) {
             contextualInfo = "\n\nRecent browsing history:\n";
             recentMemories.forEach((memory, index) => {
@@ -212,8 +212,8 @@ export class ChatManager {
               contextualInfo += `   URL: ${memory.url}\n`;
               if (memory.content) {
                 const content =
-                  memory.content.length > 200
-                    ? memory.content.substring(0, 200) + "..."
+                  memory.content.length > 500
+                    ? memory.content.substring(0, 500) + "..."
                     : memory.content;
                 contextualInfo += `   Content: ${content}\n`;
               }
