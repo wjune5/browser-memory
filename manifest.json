@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Browser AI Memory",
+  "version": "1.0.0",
+  "description": "AI-powered browser memory to remember and recall your browsing context",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs",
+    "history",
+    "bookmarks",
+    "notifications",
+    "contextMenus",
+    "alarms"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Browser AI Memory"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.svg",
+    "48": "icons/icon48.svg",
+    "128": "icons/icon128.svg"
+  }
+}

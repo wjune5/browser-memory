@@ -1,0 +1,25 @@
+{
+  "name": "ai-browser-memory",
+  "version": "1.0.0",
+  "description": "AI-powered browser memory Chrome extension",
+  "private": true,
+  "scripts": {
+    "build": "webpack --mode production",
+    "dev": "webpack --mode development --watch",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "start": "npm run dev"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "@types/node": "^20.14.8",
+    "copy-webpack-plugin": "^12.0.2",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.4.5",
+    "webpack": "^5.92.1",
+    "webpack-cli": "^5.1.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

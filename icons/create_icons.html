@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Create Extension Icons</title>
+  </head>
+  <body>
+    <h3>Generating placeholder icons...</h3>
+    <div id="icons"></div>
+
+    <script>
+      function createIcon(size) {
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+
+        // Create gradient background
+        const gradient = ctx.createLinearGradient(0, 0, size, size);
+        gradient.addColorStop(0, "#667eea");
+        gradient.addColorStop(1, "#764ba2");
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, size, size);
+
+        // Add brain emoji or text
+        ctx.fillStyle = "white";
+        ctx.font = `${size * 0.6}px Arial`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("🧠", size / 2, size / 2);
+
+        return canvas.toDataURL("image/png");
+      }
+
+      // Create icons
+      const sizes = [16, 48, 128];
+      const iconsDiv = document.getElementById("icons");
+
+      sizes.forEach((size) => {
+        const dataUrl = createIcon(size);
+        const link = document.createElement("a");
+        link.href = dataUrl;
+        link.download = `icon${size}.png`;
+        link.textContent = `Download icon${size}.png`;
+        link.style.display = "block";
+        link.style.margin = "10px 0";
+        iconsDiv.appendChild(link);
+
+        const img = document.createElement("img");
+        img.src = dataUrl;
+        img.style.margin = "10px";
+        iconsDiv.appendChild(img);
+      });
+
+      console.log(
+        "Icons generated! Right-click each download link and save the files to the icons folder."
+      );
+    </script>
+  </body>
+</html>
