@@ -363,7 +363,7 @@ export class EmbeddingsStorage {
     const serialized = JSON.stringify(memory);
     const sizeKB = new Blob([serialized]).size / 1024;
 
-    if (sizeKB > 50) {
+    if (sizeKB > 150) {
       // If memory is too large, store without embeddings
       console.warn(
         "Memory too large, storing without embeddings:",
