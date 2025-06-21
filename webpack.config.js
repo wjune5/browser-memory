@@ -9,7 +9,9 @@ module.exports = (env, argv) => {
       popup: "./src/popup.ts",
       background: "./src/background.ts",
       content: "./src/content.ts",
-      embeddings: "./src/embeddings.ts"
+      embeddings: "./src/embeddings.ts",
+      chat: "./src/chat.ts",
+      chatUI: "./src/chatUI.ts"
     },
     output: {
       path: path.resolve(__dirname, "dist"),

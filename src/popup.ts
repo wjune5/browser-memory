@@ -1,4 +1,6 @@
 /// <reference types="chrome"/>
+import { ChatManager } from "./chat";
+import { ChatUI } from "./chatUI";
 import { EmbeddingsService, EmbeddingsStorage } from "./embeddings";
 import type { EmbeddingConfig, Memory, SearchResult } from "./types/memory";
 
@@ -18,12 +20,23 @@ const autoSaveToggle = document.getElementById(
 const apiKeyInput = document.getElementById("apiKeyInput") as HTMLInputElement;
 const status = document.getElementById("status") as HTMLDivElement;
 
+// Chat and UI managers
+let chatManager: ChatManager;
+let chatUI: ChatUI;
+
 // Initialize popup
 document.addEventListener("DOMContentLoaded", () => {
   loadRecentMemories();
   loadSettings();
   updateStatus("Ready");
   updateStorageInfo(); // Show storage usage
+
+  // Initialize chat functionality
+  chatManager = new ChatManager(updateStatus);
+  chatUI = new ChatUI(updateStatus, () => chatManager.focusChatInput());
+
+  chatManager.initializeChat();
+  chatUI.initialize();
 });
 
 // Event listeners
