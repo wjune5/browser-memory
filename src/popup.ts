@@ -18,14 +18,6 @@ const autoSaveToggle = document.getElementById(
 const apiKeyInput = document.getElementById("apiKeyInput") as HTMLInputElement;
 const status = document.getElementById("status") as HTMLDivElement;
 
-// Infinite scroll state
-let currentMemories: Memory[] = [];
-let currentSearchResults: SearchResult[] = [];
-let loadedCount = 0;
-let isSearchMode = false;
-let isLoading = false;
-const MEMORIES_PER_PAGE = 10;
-
 // Initialize popup
 document.addEventListener("DOMContentLoaded", () => {
   loadRecentMemories();
@@ -42,126 +34,25 @@ searchInput.addEventListener("keypress", (e: KeyboardEvent) => {
   }
 });
 
-// Listen for input changes to detect when search field is cleared
-searchInput.addEventListener("input", () => {
-  const query = searchInput.value.trim();
-  if (!query) {
-    // Restore default memory list when search is cleared
-    loadRecentMemories();
-    updateStatus("Ready");
-  }
-});
-
 saveCurrentPageBtn.addEventListener("click", saveCurrentPage);
 clearMemoryBtn.addEventListener("click", clearMemory);
 autoSaveToggle.addEventListener("change", handleAutoSaveToggle);
 apiKeyInput.addEventListener("change", handleApiKeyChange);
 
-// Infinite scroll listener
-memoryList.addEventListener("scroll", handleScroll);
-
-// Event delegation for memory URL clicks
-memoryList.addEventListener("click", handleMemoryClick);
-
-// Infinite scroll handler
-async function handleScroll(): Promise<void> {
-  if (isLoading) return;
-
-  const { scrollTop, scrollHeight, clientHeight } = memoryList;
-  const scrolledToBottom = scrollTop + clientHeight >= scrollHeight - 5;
-
-  if (scrolledToBottom) {
-    if (isSearchMode) {
-      await loadMoreSearchResults();
-    } else {
-      await loadMoreMemories();
-    }
-  }
-}
-
 // Search functionality
 async function handleSearch(): Promise<void> {
   const query = searchInput.value.trim();
-
-  if (!query) {
-    // Restore default memory list when search is empty
-    isSearchMode = false;
-    loadedCount = 0;
-    await loadRecentMemories();
-    updateStatus("Ready");
-    return;
-  }
+  if (!query) return;
 
   updateStatus("Searching...");
-  isSearchMode = true;
-  loadedCount = 0;
 
   try {
-    currentSearchResults = await searchMemories(query);
-    displaySearchResults(currentSearchResults.slice(0, MEMORIES_PER_PAGE));
-    loadedCount = Math.min(MEMORIES_PER_PAGE, currentSearchResults.length);
-    updateStatus(`Found ${currentSearchResults.length} results`);
+    const results = await searchMemories(query);
+    displaySearchResults(results);
+    updateStatus(`Found ${results.length} results`);
   } catch (error) {
     console.error("Search error:", error);
     updateStatus("Search failed");
-  }
-}
-
-// Load more search results for infinite scroll
-async function loadMoreSearchResults(): Promise<void> {
-  if (loadedCount >= currentSearchResults.length) return;
-
-  isLoading = true;
-  showLoadingIndicator();
-
-  const nextBatch = currentSearchResults.slice(
-    loadedCount,
-    loadedCount + MEMORIES_PER_PAGE
-  );
-
-  if (nextBatch.length > 0) {
-    appendSearchResults(nextBatch);
-    loadedCount += nextBatch.length;
-  }
-
-  hideLoadingIndicator();
-  isLoading = false;
-}
-
-// Load more memories for infinite scroll
-async function loadMoreMemories(): Promise<void> {
-  if (loadedCount >= currentMemories.length) return;
-
-  isLoading = true;
-  showLoadingIndicator();
-
-  const nextBatch = currentMemories.slice(
-    loadedCount,
-    loadedCount + MEMORIES_PER_PAGE
-  );
-
-  if (nextBatch.length > 0) {
-    appendMemories(nextBatch);
-    loadedCount += nextBatch.length;
-  }
-
-  hideLoadingIndicator();
-  isLoading = false;
-}
-
-function showLoadingIndicator(): void {
-  const existingIndicator = document.getElementById("loading-indicator");
-  if (!existingIndicator) {
-    const loadingHTML =
-      '<div id="loading-indicator" class="memory-item" style="text-align: center; color: #666;">Loading more memories...</div>';
-    memoryList.insertAdjacentHTML("beforeend", loadingHTML);
-  }
-}
-
-function hideLoadingIndicator(): void {
-  const indicator = document.getElementById("loading-indicator");
-  if (indicator) {
-    indicator.remove();
   }
 }
 
@@ -323,7 +214,9 @@ async function searchMemories(query: string): Promise<SearchResult[]> {
   const settings = result.settings;
 
   if (!query.trim()) {
-    return memories.map((memory) => ({ ...memory, relevanceScore: 1 }));
+    return memories
+      .slice(0, 10)
+      .map((memory) => ({ ...memory, relevanceScore: 1 }));
   }
 
   // Try semantic search if embeddings are available
@@ -393,9 +286,8 @@ function calculateRelevanceScore(memory: Memory, query: string): number {
 async function loadRecentMemories(): Promise<void> {
   try {
     const result = await chrome.storage.local.get(["memories"]);
-    currentMemories = result.memories || [];
-    loadedCount = Math.min(MEMORIES_PER_PAGE, currentMemories.length);
-    displayMemories(currentMemories.slice(0, loadedCount));
+    const memories: Memory[] = result.memories || [];
+    displayMemories(memories.slice(0, 5)); // Show only recent 5
   } catch (error) {
     console.error("Load error:", error);
     memoryList.innerHTML =
@@ -432,30 +324,22 @@ function displayMemories(memories: Memory[]): void {
 
   memoryList.innerHTML = memories
     .map(
-      (memory) => `        <div class="memory-item" data-id="${memory.id}">
-            <div style="font-weight: bold; margin-bottom: 4px;">${escapeHtml(
+      (memory) => `
+        <div class="memory-item" data-id="${memory.id}">
+            <div style="font-weight: bold; margin-bottom: 4px;">
+                <a href = ${escapeHtml(memory.url)}> 
+                ${escapeHtml(
               memory.title
-            )}</div>
+            )}
+                </a>
+            </div>
             <div style="font-size: 11px; color: #666; margin-bottom: 4px;">
                 ${new Date(memory.timestamp).toLocaleDateString()}
-            </div>
-            <div style="font-size: 12px;">
-                <a href="#" class="memory-url" data-url="${escapeHtml(
-                  memory.url
-                )}" 
-                   style="color: #1a73e8; text-decoration: none; cursor: pointer;"
-                   title="${escapeHtml(memory.url)}">
-                    ${escapeHtml(
-                      memory.url.length > 50
-                        ? memory.url.substring(0, 50) + "..."
-                        : memory.url
-                    )}
-                </a>
             </div>
         </div>
     `
     )
-    .join("");
+    .join(""); 
 }
 
 function displaySearchResults(results: SearchResult[]): void {
@@ -465,41 +349,6 @@ function displaySearchResults(results: SearchResult[]): void {
   }
 
   displayMemories(results);
-}
-
-function appendSearchResults(results: SearchResult[]): void {
-  appendMemories(results);
-}
-
-function appendMemories(memories: Memory[]): void {
-  const memoryHTML = memories
-    .map(
-      (memory) => `        <div class="memory-item" data-id="${memory.id}">
-            <div style="font-weight: bold; margin-bottom: 4px;">${escapeHtml(
-              memory.title
-            )}</div>
-            <div style="font-size: 11px; color: #666; margin-bottom: 4px;">
-                ${new Date(memory.timestamp).toLocaleDateString()}
-            </div>
-            <div style="font-size: 12px;">
-                <a href="#" class="memory-url" data-url="${escapeHtml(
-                  memory.url
-                )}" 
-                   style="color: #1a73e8; text-decoration: none; cursor: pointer;"
-                   title="${escapeHtml(memory.url)}">
-                    ${escapeHtml(
-                      memory.url.length > 50
-                        ? memory.url.substring(0, 50) + "..."
-                        : memory.url
-                    )}
-                </a>
-            </div>
-        </div>
-    `
-    )
-    .join("");
-
-  memoryList.insertAdjacentHTML("beforeend", memoryHTML);
 }
 
 async function loadSettings(): Promise<void> {
@@ -574,29 +423,4 @@ function escapeHtml(text: string): string {
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
-}
-
-// Handle clicks on memory items (specifically URL links)
-async function handleMemoryClick(event: Event): Promise<void> {
-  const target = event.target as HTMLElement;
-
-  // Check if the clicked element is a memory URL link
-  if (target.classList.contains("memory-url")) {
-    event.preventDefault();
-
-    const url = target.getAttribute("data-url");
-    if (url) {
-      try {
-        // Open the URL in a new tab
-        await chrome.tabs.create({ url: url });
-        updateStatus("Opening page...");
-
-        // Clear status after 2 seconds
-        setTimeout(() => updateStatus("Ready"), 2000);
-      } catch (error) {
-        console.error("Error opening URL:", error);
-        updateStatus("Failed to open page");
-      }
-    }
-  }
 }
