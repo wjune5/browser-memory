@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Browser AI Memory</title>
+    <title>QuickSeek</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
@@ -12,15 +12,17 @@
         <h1>
           <img
             src="icons/extension_icon_transparent.png"
-            alt="AI Memory"
+            alt="QuickSeek"
             class="header-icon"
           />
-          AI Memory
+          QuickSeek
         </h1>
-        
+
         <!-- Settings Gear Icon -->
-        <button id="settingsBtn" class="settings-btn" title="Settings">⚙️</button>
-        
+        <button id="settingsBtn" class="settings-btn" title="Settings">
+          ⚙️
+        </button>
+
         <!-- Mode Toggle -->
         <div class="mode-toggle">
           <button id="searchModeBtn" class="mode-btn active">🔍 Search</button>
@@ -63,9 +65,15 @@
             <div id="chatMessages" class="chat-messages">
               <!-- Chat messages will be populated here -->
             </div>
-            
+
             <div class="chat-input-section">
-              <button id="newChatBtn" class="new-chat-btn" title="Start new chat">+</button>
+              <button
+                id="newChatBtn"
+                class="new-chat-btn"
+                title="Start new chat"
+              >
+                +
+              </button>
               <input
                 type="text"
                 id="chatInput"

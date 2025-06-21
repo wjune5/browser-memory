@@ -300,7 +300,7 @@ async function loadRecentMemories(): Promise<void> {
   try {
     const result = await chrome.storage.local.get(["memories"]);
     const memories: Memory[] = result.memories || [];
-    displayMemories(memories.slice(0, 5)); // Show only recent 5
+    displayMemories(memories);
   } catch (error) {
     console.error("Load error:", error);
     memoryList.innerHTML =
