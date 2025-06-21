@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "QuickSeek",
   "version": "1.0.0",
-  "description": "AI-powered browser memory to remember and recall your browsing context",
+  "description": "AI-powered browser memory to remember, recall and chat with your browsing context",
   "permissions": [
     "activeTab",
     "storage",
