@@ -17,55 +17,88 @@
           />
           AI Memory
         </h1>
+        
+        <!-- Mode Toggle -->
+        <div class="mode-toggle">
+          <button id="searchModeBtn" class="mode-btn active">🔍 Search</button>
+          <button id="chatModeBtn" class="mode-btn">💬 Chat</button>
+        </div>
       </header>
 
       <main>
-        <div class="search-section">
-          <input
-            type="text"
-            id="searchInput"
-            placeholder="Ask me anything about your browsing..."
-          />
-          <button id="searchBtn">Search</button>
-        </div>
-
-        <div class="memory-section">
-          <h3>Recent Memories</h3>
-          <div id="memoryList" class="memory-list">
-            <!-- Memory items will be populated here -->
-          </div>
-        </div>
-
-        <div class="settings-section">
-          <h3>Settings</h3>
-
-          <div class="setting-group">
-            <label for="apiKeyInput">OpenAI API Key:</label>
+        <!-- Search Mode Section -->
+        <div id="searchSection" class="mode-section active">
+          <div class="search-section">
             <input
-              type="password"
-              id="apiKeyInput"
-              placeholder="sk-..."
-              class="api-key-input"
+              type="text"
+              id="searchInput"
+              placeholder="Ask me anything about your browsing..."
             />
-            <small class="help-text">Required for AI-powered search</small>
+            <button id="searchBtn">Search</button>
           </div>
 
-          <div class="setting-group">
-            <label class="toggle-label">
-              <input type="checkbox" id="autoSaveToggle" />
-              <span class="toggle-slider"></span>
-              Auto-save pages
-            </label>
+          <div class="memory-section">
+            <h3>Recent Memories</h3>
+            <div id="memoryList" class="memory-list">
+              <!-- Memory items will be populated here -->
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h3>Settings</h3>
+
+            <div class="setting-group">
+              <label for="apiKeyInput">OpenAI API Key:</label>
+              <input
+                type="password"
+                id="apiKeyInput"
+                placeholder="sk-..."
+                class="api-key-input"
+              />
+              <small class="help-text">Required for AI-powered search</small>
+            </div>
+
+            <div class="setting-group">
+              <label class="toggle-label">
+                <input type="checkbox" id="autoSaveToggle" />
+                <span class="toggle-slider"></span>
+                Auto-save pages
+              </label>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="saveCurrentPage" class="action-btn">
+              💾 Save Current Page
+            </button>
+            <button id="clearMemory" class="action-btn secondary">
+              🗑️ Clear Memory
+            </button>
           </div>
         </div>
 
-        <div class="actions">
-          <button id="saveCurrentPage" class="action-btn">
-            💾 Save Current Page
-          </button>
-          <button id="clearMemory" class="action-btn secondary">
-            🗑️ Clear Memory
-          </button>
+        <!-- Chat Mode Section -->
+        <div id="chatSection" class="mode-section">
+          <div class="chat-section">
+            <div id="chatMessages" class="chat-messages">
+              <!-- Chat messages will be populated here -->
+            </div>
+            
+            <div class="chat-input-section">
+              <input
+                type="text"
+                id="chatInput"
+                placeholder="Type your message..."
+              />
+              <button id="sendBtn">Send</button>
+            </div>
+          </div>
+
+          <div class="chat-actions">
+            <button id="clearChat" class="action-btn secondary">
+              🗑️ Clear Chat
+            </button>
+          </div>
         </div>
       </main>
 

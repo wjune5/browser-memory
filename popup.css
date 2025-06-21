@@ -37,11 +37,56 @@ header h1 {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  margin-bottom: 12px;
 }
 
 .header-icon {
   width: 40px;
   height: 40px;
+}
+
+/* Mode Toggle Styles */
+.mode-toggle {
+  display: flex;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 8px 12px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.mode-btn.active {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-weight: 600;
+}
+
+/* Mode Section Styles */
+.mode-section {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+}
+
+.mode-section.active {
+  display: flex;
 }
 
 main {
@@ -84,6 +129,90 @@ main {
 
 #searchBtn:hover {
   transform: translateY(-1px);
+}
+
+/* Chat Section Styles */
+.chat-section {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 12px;
+}
+
+.chat-messages {
+  flex: 1;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8f9fa;
+}
+
+.chat-message {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  max-width: 85%;
+}
+
+.chat-message.user {
+  background: #667eea;
+  color: white;
+  margin-left: auto;
+  text-align: right;
+}
+
+.chat-message.ai {
+  background: white;
+  color: #333;
+  border: 1px solid #e1e5e9;
+}
+
+.chat-message:last-child {
+  margin-bottom: 0;
+}
+
+.chat-input-section {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#chatInput {
+  flex: 1;
+  padding: 10px;
+  border: 2px solid #e1e5e9;
+  border-radius: 6px;
+  font-size: 13px;
+  transition: border-color 0.2s ease;
+}
+
+#chatInput:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+#sendBtn {
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+#sendBtn:hover {
+  transform: translateY(-1px);
+}
+
+.chat-actions {
+  margin-top: 12px;
 }
 
 .memory-section {
@@ -203,17 +332,16 @@ footer {
 
 .setting-group label {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   font-size: 13px;
-  color: #333;
+  color: #555;
   font-weight: 500;
 }
 
-/* Override for toggle labels */
 .setting-group label.toggle-label {
   display: flex;
   align-items: center;
-  gap: 10px;
+  cursor: pointer;
   margin-bottom: 0;
 }
 
@@ -222,66 +350,63 @@ footer {
   padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: 12px;
   font-family: monospace;
-  background: white;
-  transition: border-color 0.2s ease;
 }
 
 .api-key-input:focus {
   outline: none;
   border-color: #667eea;
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
 }
 
 .help-text {
-  display: block;
-  margin-top: 4px;
   font-size: 11px;
   color: #666;
-  font-style: italic;
+  margin-top: 4px;
+  display: block;
 }
 
 .toggle-label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  font-size: 13px;
-  color: #333;
-  font-weight: 500;
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
 }
 
 .toggle-label input[type="checkbox"] {
-  display: none;
+  opacity: 0;
+  width: 0;
+  height: 0;
 }
 
 .toggle-slider {
-  position: relative;
-  width: 44px;
-  height: 24px;
-  background: #ccc;
-  border-radius: 12px;
-  transition: background 0.3s;
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.4s;
+  border-radius: 24px;
 }
 
 .toggle-slider::before {
-  content: "";
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 20px;
-  height: 20px;
-  background: white;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.4s;
   border-radius: 50%;
-  transition: transform 0.3s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .toggle-label input[type="checkbox"]:checked + .toggle-slider {
-  background: #4caf50;
+  background-color: #667eea;
 }
 
 .toggle-label input[type="checkbox"]:checked + .toggle-slider::before {
-  transform: translateX(20px);
+  transform: translateX(26px);
 }

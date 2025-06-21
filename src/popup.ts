@@ -18,12 +18,30 @@ const autoSaveToggle = document.getElementById(
 const apiKeyInput = document.getElementById("apiKeyInput") as HTMLInputElement;
 const status = document.getElementById("status") as HTMLDivElement;
 
+// Mode toggle elements
+const searchModeBtn = document.getElementById("searchModeBtn") as HTMLButtonElement;
+const chatModeBtn = document.getElementById("chatModeBtn") as HTMLButtonElement;
+const searchSection = document.getElementById("searchSection") as HTMLDivElement;
+const chatSection = document.getElementById("chatSection") as HTMLDivElement;
+
+// Chat elements
+const chatInput = document.getElementById("chatInput") as HTMLInputElement;
+const sendBtn = document.getElementById("sendBtn") as HTMLButtonElement;
+const chatMessages = document.getElementById("chatMessages") as HTMLDivElement;
+const clearChatBtn = document.getElementById("clearChat") as HTMLButtonElement;
+
+// Chat state
+let chatHistory: Array<{ role: "user" | "ai"; message: string; timestamp: string }> = [];
+
 // Initialize popup
 document.addEventListener("DOMContentLoaded", () => {
   loadRecentMemories();
   loadSettings();
   updateStatus("Ready");
   updateStorageInfo(); // Show storage usage
+  
+  // Initialize chat interface
+  initializeChat();
 });
 
 // Event listeners
@@ -38,6 +56,123 @@ saveCurrentPageBtn.addEventListener("click", saveCurrentPage);
 clearMemoryBtn.addEventListener("click", clearMemory);
 autoSaveToggle.addEventListener("change", handleAutoSaveToggle);
 apiKeyInput.addEventListener("change", handleApiKeyChange);
+
+// Mode toggle event listeners
+searchModeBtn.addEventListener("click", () => switchMode("search"));
+chatModeBtn.addEventListener("click", () => switchMode("chat"));
+
+// Chat event listeners
+sendBtn.addEventListener("click", handleSendMessage);
+chatInput.addEventListener("keypress", (e: KeyboardEvent) => {
+  if (e.key === "Enter") {
+    handleSendMessage();
+  }
+});
+clearChatBtn.addEventListener("click", clearChat);
+
+// Mode switching functionality
+function switchMode(mode: "search" | "chat"): void {
+  // Update button states
+  searchModeBtn.classList.toggle("active", mode === "search");
+  chatModeBtn.classList.toggle("active", mode === "chat");
+  
+  // Update section visibility
+  searchSection.classList.toggle("active", mode === "search");
+  chatSection.classList.toggle("active", mode === "chat");
+  
+  // Update status
+  updateStatus(mode === "search" ? "Search mode" : "Chat mode");
+  
+  // Focus appropriate input
+  if (mode === "search") {
+    searchInput.focus();
+  } else {
+    chatInput.focus();
+  }
+}
+
+// Chat functionality
+function initializeChat(): void {
+  // Add welcome message
+  addChatMessage("ai", "Hello! I'm your AI assistant. How can I help you today?");
+}
+
+function handleSendMessage(): void {
+  const message = chatInput.value.trim();
+  if (!message) return;
+  
+  // Add user message to chat
+  addChatMessage("user", message);
+  chatInput.value = "";
+  
+  // Show typing indicator
+  updateStatus("AI is thinking...");
+  
+  // Simulate AI response (replace with actual AI integration)
+  setTimeout(() => {
+    const aiResponse = generateAIResponse(message);
+    addChatMessage("ai", aiResponse);
+    updateStatus("Chat mode");
+  }, 1000);
+}
+
+function addChatMessage(role: "user" | "ai", message: string): void {
+  const timestamp = new Date().toLocaleTimeString();
+  chatHistory.push({ role, message, timestamp });
+  
+  const messageElement = document.createElement("div");
+  messageElement.className = `chat-message ${role}`;
+  messageElement.innerHTML = `
+    <div class="message-content">${escapeHtml(message)}</div>
+    <div class="message-time" style="font-size: 10px; opacity: 0.7; margin-top: 4px;">
+      ${timestamp}
+    </div>
+  `;
+  
+  chatMessages?.appendChild(messageElement);
+  if (chatMessages) {
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+}
+
+function generateAIResponse(userMessage: string): string {
+  // Placeholder AI response - replace with actual AI integration
+  const responses = [
+    "That's an interesting question! I'd be happy to help you with that.",
+    "I understand what you're asking. Let me think about the best way to approach this.",
+    "Thanks for sharing that with me. I can definitely assist you with this topic.",
+    "I see what you mean. This is something I can help you explore further.",
+    "That's a great point! I'd love to discuss this more with you."
+  ];
+  
+  // Simple keyword-based responses
+  if (userMessage.toLowerCase().includes("hello") || userMessage.toLowerCase().includes("hi")) {
+    return "Hello! How can I assist you today?";
+  }
+  
+  if (userMessage.toLowerCase().includes("help")) {
+    return "I'm here to help! You can ask me questions, have a conversation, or just chat. What would you like to know?";
+  }
+  
+  if (userMessage.toLowerCase().includes("thank")) {
+    return "You're welcome! I'm glad I could help. Is there anything else you'd like to discuss?";
+  }
+  
+  // Return random response for other messages
+  const randomIndex = Math.floor(Math.random() * responses.length);
+  return responses[randomIndex] || "I'm here to help! What would you like to know?";
+}
+
+function clearChat(): void {
+  if (confirm("Are you sure you want to clear the chat history?")) {
+    chatHistory = [];
+    if (chatMessages) {
+      chatMessages.innerHTML = "";
+    }
+    initializeChat(); // Add welcome message back
+    updateStatus("Chat cleared");
+  }
+}
 
 // Search functionality
 async function handleSearch(): Promise<void> {
@@ -327,9 +462,9 @@ function displayMemories(memories: Memory[]): void {
       (memory) => `
         <div class="memory-item" data-id="${memory.id}">
             <div style="font-weight: bold; margin-bottom: 4px;">
-                <a href = ${escapeHtml(memory.url)}> 
+                <a href = ${escapeHtml(memory.url || "")}> 
                 ${escapeHtml(
-              memory.title
+              memory.title || ""
             )}
                 </a>
             </div>
