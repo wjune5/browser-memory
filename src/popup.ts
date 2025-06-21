@@ -18,6 +18,14 @@ const autoSaveToggle = document.getElementById(
 const apiKeyInput = document.getElementById("apiKeyInput") as HTMLInputElement;
 const status = document.getElementById("status") as HTMLDivElement;
 
+// Infinite scroll state
+let currentMemories: Memory[] = [];
+let currentSearchResults: SearchResult[] = [];
+let loadedCount = 0;
+let isSearchMode = false;
+let isLoading = false;
+const MEMORIES_PER_PAGE = 10;
+
 // Initialize popup
 document.addEventListener("DOMContentLoaded", () => {
   loadRecentMemories();
@@ -34,25 +42,123 @@ searchInput.addEventListener("keypress", (e: KeyboardEvent) => {
   }
 });
 
+// Listen for input changes to detect when search field is cleared
+searchInput.addEventListener("input", () => {
+  const query = searchInput.value.trim();
+  if (!query) {
+    // Restore default memory list when search is cleared
+    loadRecentMemories();
+    updateStatus("Ready");
+  }
+});
+
 saveCurrentPageBtn.addEventListener("click", saveCurrentPage);
 clearMemoryBtn.addEventListener("click", clearMemory);
 autoSaveToggle.addEventListener("change", handleAutoSaveToggle);
 apiKeyInput.addEventListener("change", handleApiKeyChange);
 
+// Infinite scroll listener
+memoryList.addEventListener("scroll", handleScroll);
+
+// Infinite scroll handler
+async function handleScroll(): Promise<void> {
+  if (isLoading) return;
+
+  const { scrollTop, scrollHeight, clientHeight } = memoryList;
+  const scrolledToBottom = scrollTop + clientHeight >= scrollHeight - 5;
+
+  if (scrolledToBottom) {
+    if (isSearchMode) {
+      await loadMoreSearchResults();
+    } else {
+      await loadMoreMemories();
+    }
+  }
+}
+
 // Search functionality
 async function handleSearch(): Promise<void> {
   const query = searchInput.value.trim();
-  if (!query) return;
+
+  if (!query) {
+    // Restore default memory list when search is empty
+    isSearchMode = false;
+    loadedCount = 0;
+    await loadRecentMemories();
+    updateStatus("Ready");
+    return;
+  }
 
   updateStatus("Searching...");
+  isSearchMode = true;
+  loadedCount = 0;
 
   try {
-    const results = await searchMemories(query);
-    displaySearchResults(results);
-    updateStatus(`Found ${results.length} results`);
+    currentSearchResults = await searchMemories(query);
+    displaySearchResults(currentSearchResults.slice(0, MEMORIES_PER_PAGE));
+    loadedCount = Math.min(MEMORIES_PER_PAGE, currentSearchResults.length);
+    updateStatus(`Found ${currentSearchResults.length} results`);
   } catch (error) {
     console.error("Search error:", error);
     updateStatus("Search failed");
+  }
+}
+
+// Load more search results for infinite scroll
+async function loadMoreSearchResults(): Promise<void> {
+  if (loadedCount >= currentSearchResults.length) return;
+
+  isLoading = true;
+  showLoadingIndicator();
+
+  const nextBatch = currentSearchResults.slice(
+    loadedCount,
+    loadedCount + MEMORIES_PER_PAGE
+  );
+
+  if (nextBatch.length > 0) {
+    appendSearchResults(nextBatch);
+    loadedCount += nextBatch.length;
+  }
+
+  hideLoadingIndicator();
+  isLoading = false;
+}
+
+// Load more memories for infinite scroll
+async function loadMoreMemories(): Promise<void> {
+  if (loadedCount >= currentMemories.length) return;
+
+  isLoading = true;
+  showLoadingIndicator();
+
+  const nextBatch = currentMemories.slice(
+    loadedCount,
+    loadedCount + MEMORIES_PER_PAGE
+  );
+
+  if (nextBatch.length > 0) {
+    appendMemories(nextBatch);
+    loadedCount += nextBatch.length;
+  }
+
+  hideLoadingIndicator();
+  isLoading = false;
+}
+
+function showLoadingIndicator(): void {
+  const existingIndicator = document.getElementById("loading-indicator");
+  if (!existingIndicator) {
+    const loadingHTML =
+      '<div id="loading-indicator" class="memory-item" style="text-align: center; color: #666;">Loading more memories...</div>';
+    memoryList.insertAdjacentHTML("beforeend", loadingHTML);
+  }
+}
+
+function hideLoadingIndicator(): void {
+  const indicator = document.getElementById("loading-indicator");
+  if (indicator) {
+    indicator.remove();
   }
 }
 
@@ -214,9 +320,7 @@ async function searchMemories(query: string): Promise<SearchResult[]> {
   const settings = result.settings;
 
   if (!query.trim()) {
-    return memories
-      .slice(0, 10)
-      .map((memory) => ({ ...memory, relevanceScore: 1 }));
+    return memories.map((memory) => ({ ...memory, relevanceScore: 1 }));
   }
 
   // Try semantic search if embeddings are available
@@ -286,8 +390,9 @@ function calculateRelevanceScore(memory: Memory, query: string): number {
 async function loadRecentMemories(): Promise<void> {
   try {
     const result = await chrome.storage.local.get(["memories"]);
-    const memories: Memory[] = result.memories || [];
-    displayMemories(memories.slice(0, 5)); // Show only recent 5
+    currentMemories = result.memories || [];
+    loadedCount = Math.min(MEMORIES_PER_PAGE, currentMemories.length);
+    displayMemories(currentMemories.slice(0, loadedCount));
   } catch (error) {
     console.error("Load error:", error);
     memoryList.innerHTML =
@@ -352,6 +457,36 @@ function displaySearchResults(results: SearchResult[]): void {
   }
 
   displayMemories(results);
+}
+
+function appendSearchResults(results: SearchResult[]): void {
+  appendMemories(results);
+}
+
+function appendMemories(memories: Memory[]): void {
+  const memoryHTML = memories
+    .map(
+      (memory) => `
+        <div class="memory-item" data-id="${memory.id}">
+            <div style="font-weight: bold; margin-bottom: 4px;">${escapeHtml(
+              memory.title
+            )}</div>
+            <div style="font-size: 11px; color: #666; margin-bottom: 4px;">
+                ${new Date(memory.timestamp).toLocaleDateString()}
+            </div>
+            <div style="font-size: 12px; color: #888;">
+                ${escapeHtml(
+                  memory.url.length > 50
+                    ? memory.url.substring(0, 50) + "..."
+                    : memory.url
+                )}
+            </div>
+        </div>
+    `
+    )
+    .join("");
+
+  memoryList.insertAdjacentHTML("beforeend", memoryHTML);
 }
 
 async function loadSettings(): Promise<void> {
