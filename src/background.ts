@@ -240,16 +240,29 @@ async function addMemory(memory: Memory): Promise<void> {
             for (const chunk of chunks.slice(0, 5)) {
               // Limit to 5 chunks to save storage
               try {
-                chunk.embedding = await embeddingsService.generateEmbedding(
-                  chunk.content
+                chunk.embedding = await retryWithBackoff(
+                  () => embeddingsService.generateEmbedding(chunk.content),
+                  `chunk ${chunk.id}`
                 );
                 memory.chunks.push(chunk);
               } catch (chunkError) {
                 console.warn(
-                  "Failed to generate embedding for chunk:",
-                  chunkError
+                  `⚠️ Failed to generate embedding for chunk ${chunk.id} after retries:`,
+                  {
+                    chunkId: chunk.id,
+                    chunkLength: chunk.content.length,
+                    error:
+                      chunkError instanceof Error
+                        ? chunkError.message
+                        : chunkError,
+                    url: memory.url,
+                    title: memory.title?.substring(0, 50) + "..."
+                  }
                 );
-                memory.chunks.push(chunk); // Store chunk without embedding
+                // Skip chunks that fail embedding generation to avoid chunks without embeddings
+                console.log(
+                  `🚫 Skipping chunk ${chunk.id} due to embedding failure`
+                );
               }
             }
           }
@@ -275,6 +288,49 @@ async function addMemory(memory: Memory): Promise<void> {
       await chrome.storage.local.set({ memories: trimmedMemories });
     }
   }
+}
+
+// Helper function for retry with exponential backoff
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  context: string,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        const delay = baseDelay * Math.pow(2, attempt - 1);
+        console.log(
+          `🔄 Retrying ${context} (attempt ${attempt + 1}/${
+            maxRetries + 1
+          }) after ${delay}ms delay`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      console.warn(`❌ Attempt ${attempt + 1} failed for ${context}:`, {
+        error: error instanceof Error ? error.message : error,
+        attempt: attempt + 1,
+        maxRetries: maxRetries + 1
+      });
+
+      if (attempt === maxRetries) {
+        console.error(
+          `🚨 All ${maxRetries + 1} attempts failed for ${context}`,
+          lastError
+        );
+        throw lastError;
+      }
+    }
+  }
+
+  throw lastError;
 }
 
 // Search memories with semantic search support
