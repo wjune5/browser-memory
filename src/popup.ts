@@ -1,7 +1,7 @@
 /// <reference types="chrome"/>
-import { EmbeddingsService, EmbeddingsStorage } from "./embeddings";
 import { ChatManager } from "./chat";
 import { ChatUI } from "./chatUI";
+import { EmbeddingsService, EmbeddingsStorage } from "./embeddings";
 import type { EmbeddingConfig, Memory, SearchResult } from "./types/memory";
 
 // DOM elements with proper typing
@@ -30,11 +30,11 @@ document.addEventListener("DOMContentLoaded", () => {
   loadSettings();
   updateStatus("Ready");
   updateStorageInfo(); // Show storage usage
-  
+
   // Initialize chat functionality
   chatManager = new ChatManager(updateStatus);
   chatUI = new ChatUI(updateStatus, () => chatManager.focusChatInput());
-  
+
   chatManager.initializeChat();
   chatUI.initialize();
 });
@@ -340,10 +340,10 @@ function displayMemories(memories: Memory[]): void {
       (memory) => `
         <div class="memory-item" data-id="${memory.id}">
             <div style="font-weight: bold; margin-bottom: 4px;">
-                <a href = ${escapeHtml(memory.url || "")}> 
-                ${escapeHtml(
-              memory.title || ""
-            )}
+                <a href="${escapeHtml(
+                  memory.url
+                )}" target="_blank" class="memory-link"> 
+                ${escapeHtml(memory.title)}
                 </a>
             </div>
             <div style="font-size: 11px; color: #666; margin-bottom: 4px;">
@@ -352,7 +352,7 @@ function displayMemories(memories: Memory[]): void {
         </div>
     `
     )
-    .join(""); 
+    .join("");
 }
 
 function displaySearchResults(results: SearchResult[]): void {
