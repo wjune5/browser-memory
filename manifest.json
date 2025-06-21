@@ -27,8 +27,8 @@
     }
   ],
   "icons": {
-    "16": "icons/icon16.svg",
-    "48": "icons/icon48.svg",
-    "128": "icons/icon128.svg"
+    "16": "icons/extension_icon_transparent.png",
+    "48": "icons/extension_icon_transparent.png",
+    "128": "icons/extension_icon_transparent.png"
   }
 }
