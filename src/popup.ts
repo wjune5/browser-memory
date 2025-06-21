@@ -2,6 +2,7 @@
 import { ChatManager } from "./chat";
 import { ChatUI } from "./chatUI";
 import { EmbeddingsService, EmbeddingsStorage } from "./embeddings";
+import { queryRewriteAgent } from "./query-agent/queryRewriteAgent";
 import type { EmbeddingConfig, Memory, SearchResult } from "./types/memory";
 
 // DOM elements with proper typing
@@ -54,15 +55,35 @@ apiKeyInput.addEventListener("change", handleApiKeyChange);
 
 // Search functionality
 async function handleSearch(): Promise<void> {
-  const query = searchInput.value.trim();
-  if (!query) return;
+  const originalQuery = searchInput.value.trim();
+  if (!originalQuery) return;
 
-  updateStatus("Searching...");
+  updateStatus("Rewriting query...");
 
   try {
-    const results = await searchMemories(query);
-    displaySearchResults(results);
-    updateStatus(`Found ${results.length} results`);
+    // Get API key from settings
+    const result = await chrome.storage.local.get(["settings"]);
+    const settings = result.settings || {};
+    const apiKey = settings.apiKey;
+
+    // Use query rewrite agent to optimize the search query
+    const rewrittenQuery = await queryRewriteAgent(originalQuery, apiKey);
+    
+    console.log(`Original query: "${originalQuery}"`);
+    console.log(`Rewritten query: "${rewrittenQuery}"`);
+
+    updateStatus("Searching...");
+
+    // Use the rewritten query for search
+    const results = await searchMemories(rewrittenQuery);
+    displaySearchResults(results, originalQuery, rewrittenQuery);
+    
+    // Show both original and rewritten query in status
+    if (originalQuery !== rewrittenQuery) {
+      updateStatus(`Found ${results.length} results (rewritten: "${rewrittenQuery}")`);
+    } else {
+      updateStatus(`Found ${results.length} results`);
+    }
   } catch (error) {
     console.error("Search error:", error);
     updateStatus("Search failed");
@@ -355,13 +376,57 @@ function displayMemories(memories: Memory[]): void {
     .join("");
 }
 
-function displaySearchResults(results: SearchResult[]): void {
+function displaySearchResults(results: SearchResult[], originalQuery?: string, rewrittenQuery?: string): void {
   if (results.length === 0) {
     memoryList.innerHTML = '<div class="memory-item">No results found</div>';
     return;
   }
 
-  displayMemories(results);
+  // If we have query rewrite info, show it
+  if (originalQuery && rewrittenQuery && originalQuery !== rewrittenQuery) {
+    const queryInfo = `
+      <div class="memory-item" style="background-color: #f0f8ff; border-left: 3px solid #007acc; padding: 8px; margin-bottom: 10px;">
+        <div style="font-size: 12px; color: #666; margin-bottom: 4px;">
+          <strong>Query Rewrite:</strong>
+        </div>
+        <div style="font-size: 11px; color: #333;">
+          <span style="color: #666;">Original:</span> "${escapeHtml(originalQuery)}"
+        </div>
+        <div style="font-size: 11px; color: #333;">
+          <span style="color: #007acc;">Rewritten:</span> "${escapeHtml(rewrittenQuery)}"
+        </div>
+      </div>
+    `;
+    memoryList.innerHTML = queryInfo + displayMemoriesHTML(results);
+  } else {
+    displayMemories(results);
+  }
+}
+
+// Helper function to generate HTML for memories
+function displayMemoriesHTML(memories: Memory[]): string {
+  if (memories.length === 0) {
+    return '<div class="memory-item">No memories stored yet</div>';
+  }
+
+  return memories
+    .map(
+      (memory) => `
+        <div class="memory-item" data-id="${memory.id}">
+            <div style="font-weight: bold; margin-bottom: 4px;">
+                <a href="${escapeHtml(
+                  memory.url
+                )}" target="_blank" class="memory-link"> 
+                ${escapeHtml(memory.title)}
+                </a>
+            </div>
+            <div style="font-size: 11px; color: #666; margin-bottom: 4px;">
+                ${new Date(memory.timestamp).toLocaleDateString()}
+            </div>
+        </div>
+    `
+    )
+    .join("");
 }
 
 async function loadSettings(): Promise<void> {
