@@ -18,6 +18,9 @@
           AI Memory
         </h1>
         
+        <!-- Settings Gear Icon -->
+        <button id="settingsBtn" class="settings-btn" title="Settings">⚙️</button>
+        
         <!-- Mode Toggle -->
         <div class="mode-toggle">
           <button id="searchModeBtn" class="mode-btn active">🔍 Search</button>
@@ -41,29 +44,6 @@
             <h3>Recent Memories</h3>
             <div id="memoryList" class="memory-list">
               <!-- Memory items will be populated here -->
-            </div>
-          </div>
-
-          <div class="settings-section">
-            <h3>Settings</h3>
-
-            <div class="setting-group">
-              <label for="apiKeyInput">OpenAI API Key:</label>
-              <input
-                type="password"
-                id="apiKeyInput"
-                placeholder="sk-..."
-                class="api-key-input"
-              />
-              <small class="help-text">Required for AI-powered search</small>
-            </div>
-
-            <div class="setting-group">
-              <label class="toggle-label">
-                <input type="checkbox" id="autoSaveToggle" />
-                <span class="toggle-slider"></span>
-                Auto-save pages
-              </label>
             </div>
           </div>
 
@@ -92,6 +72,32 @@
                 placeholder="Type your message..."
               />
               <button id="sendBtn">Send</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings Mode Section -->
+        <div id="settingsSection" class="mode-section">
+          <div class="settings-section">
+            <h3>Settings</h3>
+
+            <div class="setting-group">
+              <label for="apiKeyInput">OpenAI API Key:</label>
+              <input
+                type="password"
+                id="apiKeyInput"
+                placeholder="sk-..."
+                class="api-key-input"
+              />
+              <small class="help-text">Required for AI-powered search</small>
+            </div>
+
+            <div class="setting-group">
+              <label class="toggle-label">
+                <input type="checkbox" id="autoSaveToggle" />
+                <span class="toggle-slider"></span>
+                Auto-save pages
+              </label>
             </div>
           </div>
         </div>
