@@ -1,7 +1,10 @@
 // Chat functionality for Browser AI Memory extension
-import OpenAI from "openai";
+import { AIService } from "./ai-service";
 import { EmbeddingsService } from "./embeddings";
-import type { EmbeddingConfig, Memory } from "./types/memory";
+import type { EmbeddingConfig, Memory, ExtensionSettings } from "./types/memory";
+
+// Declare chrome for browser extension context
+declare const chrome: any;
 
 // Chat state
 export interface ChatMessage {
@@ -18,38 +21,47 @@ export class ChatManager {
   private clearChatBtn: HTMLButtonElement | null = null;
   private updateStatus: (message: string) => void;
   private embeddingsService: EmbeddingsService;
-  private openai: OpenAI | null = null;
+  private aiService: AIService | null = null;
+  private settings: ExtensionSettings | null = null;
 
   constructor(updateStatus: (message: string) => void) {
     this.updateStatus = updateStatus;
 
     // Initialize embeddings service with default config
     const embeddingConfig: EmbeddingConfig = {
-      model: "openai",
-      dimensions: 1536,
+      model: "local",
+      dimensions: 384,
       maxTokens: 500,
       chunkOverlap: 50
     };
-    this.embeddingsService = new EmbeddingsService(embeddingConfig);
+    const defaultSettings: ExtensionSettings = {
+      aiProvider: "local",
+      embeddingModel: "local",
+      chatModel: "local",
+      queryRewriteModel: "local",
+      autoSave: false,
+      maxMemories: 100
+    };
+    this.embeddingsService = new EmbeddingsService(embeddingConfig, defaultSettings);
   }
 
-  // Initialize OpenAI client
-  private async initOpenAI(): Promise<OpenAI> {
-    if (this.openai) return this.openai;
+  // Initialize AI service with current settings
+  private async initAIService(): Promise<AIService> {
+    if (this.aiService && this.settings) return this.aiService;
 
-    const settings = await chrome.storage.local.get(["settings"]);
-    const apiKey = settings.settings?.apiKey;
-
-    if (!apiKey) {
-      throw new Error("OpenAI API key not configured");
-    }
-
-    this.openai = new OpenAI({
-      apiKey: apiKey,
-      dangerouslyAllowBrowser: true
-    });
-
-    return this.openai;
+    const result = await chrome.storage.local.get(["settings"]);
+    const defaultSettings: ExtensionSettings = {
+      aiProvider: "local",
+      embeddingModel: "local",
+      chatModel: "local",
+      queryRewriteModel: "local",
+      autoSave: false,
+      maxMemories: 100
+    };
+    this.settings = result.settings || defaultSettings;
+    
+    this.aiService = new AIService(this.settings!);
+    return this.aiService;
   }
 
   // Initialize chat elements
@@ -120,7 +132,7 @@ export class ChatManager {
       console.error("Chat error:", error);
       this.addChatMessage(
         "ai",
-        "I apologize, but I encountered an error. Please make sure your OpenAI API key is configured correctly in settings."
+        "I apologize, but I encountered an error. Please make sure your AI provider is configured correctly in settings."
       );
       this.updateStatus("Error occurred");
     } finally {
@@ -151,7 +163,7 @@ export class ChatManager {
     this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
   }
 
-  // Generate AI response using OpenAI with RAG
+  // Generate AI response using selected provider with RAG
   async generateAIResponse(userMessage: string): Promise<string> {
     try {
       console.log("🤖 Generating AI response for:", userMessage);
@@ -167,10 +179,28 @@ export class ChatManager {
       // Use semantic search to find relevant memories if available
       if (memories.length > 0) {
         try {
+          // Update embeddings service with current settings
+          const settings = await this.getCurrentSettings();
+          const embeddingConfig: EmbeddingConfig = {
+            model: settings?.embeddingModel || "local",
+            dimensions: settings?.embeddingModel === "openai" ? 1536 : 384,
+            maxTokens: 500,
+            chunkOverlap: 50
+          };
+          const currentSettings = settings || {
+            aiProvider: "local",
+            embeddingModel: "local",
+            chatModel: "local",
+            queryRewriteModel: "local",
+            autoSave: false,
+            maxMemories: 100
+          };
+          this.embeddingsService = new EmbeddingsService(embeddingConfig, currentSettings);
+
           const relevantMemories = await this.embeddingsService.semanticSearch(
             userMessage,
             memories,
-            20 // Get top 5 most relevant memories
+            20 // Get top 20 most relevant memories
           );
 
           console.log("🔍 Found", relevantMemories.length, "relevant memories");
@@ -222,11 +252,11 @@ export class ChatManager {
         }
       }
 
-      // Initialize OpenAI client
-      const openai = await this.initOpenAI();
+      // Initialize AI service with current settings
+      const aiService = await this.initAIService();
 
       // Prepare chat messages with context
-      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      const messages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [
         {
           role: "system",
           content: `You are a helpful AI assistant with access to the user's browsing history and saved web content. Use the provided context to give relevant and informed responses. If the context contains relevant information, reference it naturally in your response. If the context isn't relevant, still provide a helpful response based on your general knowledge. No need to ask user about specific timeframe, if user doesn't specify, just return all applied browsing memories.${contextualInfo}`
@@ -249,23 +279,13 @@ export class ChatManager {
       });
 
       console.log(
-        "📤 Sending request to OpenAI with",
+        "📤 Sending request to AI service with",
         messages.length,
         "messages"
       );
 
-      // Call OpenAI API
-      const completion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: messages,
-        max_tokens: 1000,
-        temperature: 0.7,
-        stream: false
-      });
-
-      const response =
-        completion.choices[0]?.message?.content ||
-        "I apologize, but I couldn't generate a response. Please try again.";
+      // Call AI service
+      const response = await aiService.generateChatCompletion(messages, this.settings?.chatModel);
 
       console.log("✅ Received AI response, length:", response.length);
       return response;
@@ -274,33 +294,37 @@ export class ChatManager {
 
       if (error instanceof Error) {
         if (error.message.includes("API key")) {
-          return "Please configure your OpenAI API key in the extension settings to use the chat feature.";
+          return "Please configure your AI provider API key in the extension settings to use the chat feature.";
         } else if (
           error.message.includes("quota") ||
           error.message.includes("billing")
         ) {
-          return "It looks like you've reached your OpenAI API quota or there's a billing issue. Please check your OpenAI account.";
+          return "It looks like you've reached your API quota or there's a billing issue. Please check your account.";
         } else if (error.message.includes("rate limit")) {
           return "API rate limit reached. Please wait a moment before sending another message.";
         }
       }
 
-      return "I encountered an error while generating a response. Please try again, and make sure your OpenAI API key is configured correctly.";
+      return "I encountered an error while generating a response. Please try again, and make sure your AI provider is configured correctly.";
     }
   }
 
-  // Clear chat history (start new chat)
+  // Get current settings
+  private async getCurrentSettings(): Promise<ExtensionSettings | null> {
+    const result = await chrome.storage.local.get(["settings"]);
+    return result.settings || null;
+  }
+
+  // Clear chat history
   clearChat(): void {
-    if (
-      confirm("Start a new chat? This will clear the current conversation.")
-    ) {
-      this.chatHistory = [];
-      if (this.chatMessages) {
-        this.chatMessages.innerHTML = "";
-      }
-      this.initializeChat(); // Add welcome message back
-      this.updateStatus("New chat started");
+    this.chatHistory = [];
+    if (this.chatMessages) {
+      this.chatMessages.innerHTML = "";
     }
+    this.addChatMessage(
+      "ai",
+      "Chat history cleared. How can I help you today?"
+    );
   }
 
   // Get chat history
@@ -315,10 +339,11 @@ export class ChatManager {
     }
   }
 
-  // Escape HTML to prevent XSS
+  // Escape HTML for safe display
   private escapeHtml(text: string): string {
     const div = document.createElement("div");
     div.textContent = text;
     return div.innerHTML;
   }
 }
+

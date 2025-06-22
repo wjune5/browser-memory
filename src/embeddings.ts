@@ -1,37 +1,24 @@
+/// <reference types="chrome"/>
 // Embeddings service for RAG functionality
-import OpenAI from "openai";
+import { AIService } from "./ai-service";
 import type {
   EmbeddingConfig,
   Memory,
   SemanticSearchResult,
-  TextChunk
+  TextChunk,
+  ExtensionSettings
 } from "./types/memory";
+
+// Declare chrome for browser extension context
+declare const chrome: any;
 
 export class EmbeddingsService {
   private config: EmbeddingConfig;
-  private openai: OpenAI | null = null;
+  private aiService: AIService;
 
-  constructor(config: EmbeddingConfig) {
+  constructor(config: EmbeddingConfig, settings: ExtensionSettings) {
     this.config = config;
-  }
-
-  // Initialize OpenAI client with API key
-  private async initOpenAI(): Promise<OpenAI> {
-    if (this.openai) return this.openai;
-
-    const settings = await chrome.storage.local.get(["settings"]);
-    const apiKey = settings.settings?.apiKey;
-
-    if (!apiKey) {
-      throw new Error("OpenAI API key not configured");
-    }
-
-    this.openai = new OpenAI({
-      apiKey: apiKey,
-      dangerouslyAllowBrowser: true // Required for browser usage
-    });
-
-    return this.openai;
+    this.aiService = new AIService(settings);
   }
 
   // Split text into chunks for embedding
@@ -93,99 +80,11 @@ export class EmbeddingsService {
     console.log("📝 Text length:", text.length, "characters");
 
     try {
-      switch (this.config.model) {
-        case "openai":
-          return this.generateOpenAIEmbedding(text);
-        case "local":
-          return this.generateLocalEmbedding(text);
-        case "cohere":
-          return this.generateCohereEmbedding(text);
-        default:
-          throw new Error(`Unsupported embedding model: ${this.config.model}`);
-      }
+      return await this.aiService.generateEmbeddings(text);
     } catch (error) {
       console.error("❌ Embedding generation failed:", error);
       throw error;
     }
-  }
-
-  // OpenAI embeddings using the official SDK
-  private async generateOpenAIEmbedding(text: string): Promise<number[]> {
-    try {
-      const openai = await this.initOpenAI();
-
-      const response = await openai.embeddings.create({
-        model: "text-embedding-3-small", // 1536 dimensions, cost-effective
-        input: text,
-        encoding_format: "float"
-      });
-
-      return response.data[0]?.embedding || [];
-    } catch (error) {
-      console.error("OpenAI embedding error:", error);
-      throw new Error(
-        `OpenAI embedding failed: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    }
-  }
-
-  // Local embeddings (simple TF-IDF approximation)
-  private async generateLocalEmbedding(text: string): Promise<number[]> {
-    // Simple local embedding using word frequency
-    // In production, you'd want a proper local model like Sentence Transformers
-    const words = text.toLowerCase().match(/\b\w+\b/g) || [];
-    const wordCounts = new Map<string, number>();
-
-    words.forEach((word) => {
-      wordCounts.set(word, (wordCounts.get(word) || 0) + 1);
-    });
-
-    // Create a simple 384-dimensional vector
-    const dimensions = 384;
-    const embedding = new Array(dimensions).fill(0);
-
-    Array.from(wordCounts.entries()).forEach(([word, count], index) => {
-      const hash = this.simpleHash(word);
-      const position = Math.abs(hash) % dimensions;
-      embedding[position] += count / words.length;
-    });
-
-    // Normalize the vector
-    const magnitude = Math.sqrt(
-      embedding.reduce((sum, val) => sum + val * val, 0)
-    );
-    return embedding.map((val) => (magnitude > 0 ? val / magnitude : 0));
-  }
-
-  // Cohere embeddings
-  private async generateCohereEmbedding(text: string): Promise<number[]> {
-    const settings = await chrome.storage.local.get(["settings"]);
-    const apiKey = settings.settings?.cohereApiKey;
-
-    if (!apiKey) {
-      throw new Error("Cohere API key not configured");
-    }
-
-    const response = await fetch("https://api.cohere.ai/v1/embed", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        texts: [text],
-        model: "embed-english-light-v3.0" // 384 dimensions
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Cohere API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.embeddings[0];
   }
 
   // Calculate cosine similarity between embeddings
@@ -338,17 +237,6 @@ export class EmbeddingsService {
     );
 
     return sortedResults;
-  }
-
-  // Simple hash function for local embeddings
-  private simpleHash(str: string): number {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = (hash << 5) - hash + char;
-      hash = hash & hash; // Convert to 32-bit integer
-    }
-    return hash;
   }
 }
 

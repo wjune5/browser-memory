@@ -222,7 +222,7 @@ async function addMemory(memory: Memory): Promise<void> {
         chunkOverlap: 50
       };
 
-      const embeddingsService = new EmbeddingsService(embeddingConfig);
+      const embeddingsService = new EmbeddingsService(embeddingConfig, settings);
 
       // Generate embedding for the main content
       const contentToEmbed = memory.content || memory.title || "";
@@ -355,7 +355,7 @@ async function searchMemories(query: string): Promise<Memory[]> {
         chunkOverlap: 50
       };
 
-      const embeddingsService = new EmbeddingsService(embeddingConfig);
+      const embeddingsService = new EmbeddingsService(embeddingConfig, settings);
       const semanticResults = await embeddingsService.semanticSearch(
         query,
         memoriesWithEmbeddings,

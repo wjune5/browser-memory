@@ -60,8 +60,19 @@ export interface ExtractedContent {
 export interface ExtensionSettings {
   autoSave: boolean;
   maxMemories: number;
-  aiProvider: "local" | "openai" | "claude";
-  apiKey?: string;
+  // AI Provider Configuration
+  aiProvider: "openai" | "anthropic" | "gemini" | "cohere" | "local";
+  // API Keys for different providers
+  // openaiApiKey?: string;
+  // anthropicApiKey?: string;
+  // googleApiKey?: string;
+  // cohereApiKey?: string;
+  // Model configurations
+  embeddingModel: string;
+  chatModel: string;
+  queryRewriteModel: string;
+  // Legacy support
+  apiKey?: string; // For backward compatibility
   maxContentLength?: number;
 }
 
@@ -86,7 +97,7 @@ export interface TextChunk {
 }
 
 export interface EmbeddingConfig {
-  model: "openai" | "local" | "cohere";
+  model: string;
   dimensions: number;
   maxTokens: number;
   chunkOverlap: number;
@@ -160,4 +171,18 @@ export interface GenerateEmbeddingResponse {
 export interface SemanticSearchResponse {
   results: SemanticSearchResult[];
   error?: string;
+}
+
+// AI Provider Configuration
+export interface AIProviderConfig {
+  name: string;
+  displayName: string;
+  supportedFeatures: ("embeddings" | "chat" | "queryRewrite")[];
+  defaultModels: {
+    embeddings: string;
+    chat: string;
+    queryRewrite: string;
+  };
+  apiKeyField: string;
+  baseUrl?: string;
 }

@@ -90,14 +90,20 @@
             <h3>Settings</h3>
 
             <div class="setting-group">
-              <label for="apiKeyInput">OpenAI API Key:</label>
+              <label for="aiProviderSelect">AI Provider:</label>
+              <select id="aiProviderSelect"></select>
+            </div>
+
+            <!-- API Key fields for each provider, shown/hidden dynamically -->
+            <div class="setting-group" id="apiKeyFields">
+              <label for="apiKeyInput">API Key:</label>
               <input
                 type="password"
                 id="apiKeyInput"
-                placeholder="sk-..."
+                placeholder="Enter API key..."
                 class="api-key-input"
               />
-              <small class="help-text">Required for AI-powered search</small>
+              <small class="help-text">Required for AI-powered features</small>
             </div>
 
             <div class="setting-group">

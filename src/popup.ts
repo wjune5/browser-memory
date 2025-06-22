@@ -3,7 +3,11 @@ import { ChatManager } from "./chat";
 import { ChatUI } from "./chatUI";
 import { EmbeddingsService, EmbeddingsStorage } from "./embeddings";
 import { queryRewriteAgent } from "./query-agent/queryRewriteAgent";
-import type { EmbeddingConfig, Memory, SearchResult } from "./types/memory";
+import { AIService } from "./ai-service";
+import type { EmbeddingConfig, Memory, SearchResult, ExtensionSettings } from "./types/memory";
+import { DEFAULT_MODELS } from "./consts";
+// Declare chrome for browser extension context
+declare const chrome: any;
 
 // DOM elements with proper typing
 const searchInput = document.getElementById("searchInput") as HTMLInputElement;
@@ -21,9 +25,23 @@ const autoSaveToggle = document.getElementById(
 const apiKeyInput = document.getElementById("apiKeyInput") as HTMLInputElement;
 const status = document.getElementById("status") as HTMLDivElement;
 
+// Settings DOM elements
+const aiProviderSelect = document.getElementById("aiProviderSelect") as HTMLSelectElement;
+const apiKeyFields = document.getElementById("apiKeyFields") as HTMLDivElement;
+
 // Chat and UI managers
 let chatManager: ChatManager;
 let chatUI: ChatUI;
+
+
+// API key placeholders for each provider
+const API_KEY_PLACEHOLDERS: Record<string, string> = {
+  openai: "sk-...",
+  google: "AIza...",
+  anthropic: "sk-ant-...",
+  cohere: "...",
+  local: ""
+};
 
 // Initialize popup
 document.addEventListener("DOMContentLoaded", () => {
@@ -61,13 +79,12 @@ async function handleSearch(): Promise<void> {
   updateStatus("Rewriting query...");
 
   try {
-    // Get API key from settings
+    // Get settings
     const result = await chrome.storage.local.get(["settings"]);
     const settings = result.settings || {};
-    const apiKey = settings.apiKey;
 
     // Use query rewrite agent to optimize the search query
-    const rewrittenQuery = await queryRewriteAgent(originalQuery, apiKey);
+    const rewrittenQuery = await queryRewriteAgent(originalQuery, settings);
     
     console.log(`Original query: "${originalQuery}"`);
     console.log(`Rewritten query: "${rewrittenQuery}"`);
@@ -177,17 +194,17 @@ async function clearMemory(): Promise<void> {
 async function saveMemory(memory: Memory): Promise<void> {
   try {
     const result = await chrome.storage.local.get(["settings"]);
-    const settings = result.settings;
+    const settings = result.settings || {};
 
     // Generate embeddings for the memory
     const embeddingConfig: EmbeddingConfig = {
-      model: settings?.apiKey ? "openai" : "local", // Use OpenAI if API key available, otherwise local
-      dimensions: settings?.apiKey ? 1536 : 384, // OpenAI: 1536, Local: 384
+      model: settings?.embeddingModel || "local",
+      dimensions: settings?.embeddingModel === "openai" ? 1536 : 384,
       maxTokens: 500,
       chunkOverlap: 50
     };
 
-    const embeddingsService = new EmbeddingsService(embeddingConfig);
+    const embeddingsService = new EmbeddingsService(embeddingConfig, settings);
 
     // Generate embedding for the main content
     const contentToEmbed = memory.content || memory.title || "";
@@ -245,7 +262,7 @@ async function saveMemory(memory: Memory): Promise<void> {
 async function searchMemories(query: string): Promise<SearchResult[]> {
   const result = await chrome.storage.local.get(["memories", "settings"]);
   const memories: Memory[] = result.memories || [];
-  const settings = result.settings;
+  const settings = result.settings || {};
 
   if (!query.trim()) {
     return memories
@@ -261,13 +278,13 @@ async function searchMemories(query: string): Promise<SearchResult[]> {
   if (memoriesWithEmbeddings.length > 0) {
     try {
       const embeddingConfig: EmbeddingConfig = {
-        model: settings?.apiKey ? "openai" : "local",
-        dimensions: settings?.apiKey ? 1536 : 384,
+        model: settings?.embeddingModel || "local",
+        dimensions: settings?.embeddingModel === "openai" ? 1536 : 384,
         maxTokens: 500,
         chunkOverlap: 50
       };
 
-      const embeddingsService = new EmbeddingsService(embeddingConfig);
+      const embeddingsService = new EmbeddingsService(embeddingConfig, settings);
       const semanticResults = await embeddingsService.semanticSearch(
         query,
         memoriesWithEmbeddings,
@@ -429,17 +446,90 @@ function displayMemoriesHTML(memories: Memory[]): string {
     .join("");
 }
 
-async function loadSettings(): Promise<void> {
-  try {
-    const result = await chrome.storage.local.get(["settings"]);
-    const settings = result.settings || { autoSave: true };
-    autoSaveToggle.checked = settings.autoSave;
-    apiKeyInput.value = settings.apiKey || "";
-  } catch (error) {
-    console.error("Error loading settings:", error);
-    autoSaveToggle.checked = true; // Default to enabled
-    apiKeyInput.value = "";
+// Settings functions
+function populateProviderDropdown(selectedProvider?: string) {
+  aiProviderSelect.innerHTML = "";
+  Object.keys(DEFAULT_MODELS).forEach((provider) => {
+    const option = document.createElement("option");
+    option.value = provider;
+    option.textContent = provider.charAt(0).toUpperCase() + provider.slice(1);
+    if (provider === selectedProvider) option.selected = true;
+    aiProviderSelect.appendChild(option);
+  });
+}
+
+function updateApiKeyField(provider: string, settings: ExtensionSettings = {} as ExtensionSettings) {
+  const placeholder = API_KEY_PLACEHOLDERS[provider] || "";
+  apiKeyInput.placeholder = placeholder;
+  
+  // Get the API key for the selected provider
+  // let apiKey = "";
+  // switch (provider) {
+  //   case "openai":
+  //     apiKey = settings.openaiApiKey || "";
+  //     break;
+  //   case "google":
+  //     apiKey = settings.googleApiKey || "";
+  //     break;
+  //   case "anthropic":
+  //     apiKey = settings.anthropicApiKey || "";
+  //     break;
+  //   case "cohere":
+  //     apiKey = settings.cohereApiKey || "";
+  //     break;
+  //   case "local":
+  //     apiKey = "";
+  //     break;
+  // }
+  
+  // Show/hide API key field based on provider
+  const apiKeyGroup = apiKeyInput.closest('.setting-group') as HTMLElement;
+  if (apiKeyGroup) {
+    apiKeyGroup.style.display = provider === "local" ? "none" : "block";
   }
+}
+
+async function saveSettings() {
+  const provider = aiProviderSelect.value;
+  const autoSave = autoSaveToggle.checked;
+  const apiKey = apiKeyInput.value;
+  const defaultModels = DEFAULT_MODELS[provider];
+  
+  if (!defaultModels) {
+    console.error("Unknown provider:", provider);
+    return;
+  }
+  
+  const settings: ExtensionSettings = {
+    aiProvider: provider as any,
+    embeddingModel: defaultModels.embeddings as any,
+    chatModel: defaultModels.chat as any,
+    queryRewriteModel: defaultModels.queryRewrite as any,
+    autoSave,
+    maxMemories: 100
+  };
+  
+  await chrome.storage.local.set({ settings });
+}
+
+async function loadSettings(): Promise<void> {
+  const result = await chrome.storage.local.get(["settings"]);
+  const settings = result.settings || {};
+  const provider = settings.aiProvider || "openai";
+  
+  populateProviderDropdown(provider);
+  updateApiKeyField(provider, settings);
+  autoSaveToggle.checked = !!settings.autoSave;
+  
+  // Set up event listeners
+  aiProviderSelect.onchange = () => {
+    const newProvider = aiProviderSelect.value;
+    updateApiKeyField(newProvider);
+    saveSettings();
+  };
+  
+  apiKeyInput.onchange = saveSettings;
+  autoSaveToggle.onchange = saveSettings;
 }
 
 async function handleAutoSaveToggle(): Promise<void> {
