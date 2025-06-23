@@ -501,3 +501,67 @@ footer {
 input[type="url"] {
   font-family: monospace;
 }
+
+/* Loading Bar Styles */
+.loading-bar {
+  margin-bottom: 12px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  transition: opacity 0.3s ease;
+}
+
+.loading-bar.hidden {
+  display: none;
+}
+
+.loading-progress {
+  width: 100%;
+  height: 6px;
+  background: #e9ecef;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.loading-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea, #764ba2, #667eea);
+  background-size: 200% 100%;
+  border-radius: 3px;
+  animation: loading-pulse 2s infinite ease-in-out,
+    loading-slide 3s infinite linear;
+  width: 0%;
+  transition: width 0.5s ease;
+}
+
+.loading-bar:not(.hidden) .loading-fill {
+  width: 100%;
+}
+
+.loading-text {
+  font-size: 12px;
+  color: #667eea;
+  font-weight: 500;
+  text-align: center;
+}
+
+@keyframes loading-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes loading-slide {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}

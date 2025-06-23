@@ -31,60 +31,36 @@ class BrowserMemoryCrew:
     llm = "gpt-3.5-turbo"
 
     @agent
-    def memory_analyst_agent(self) -> Agent:
+    def conversational_agent(self) -> Agent:
         return Agent(
-            role="Browser Memory Analyst",
-            goal="Analyze browsing patterns and extract meaningful insights from user's memory data",
-            backstory="You are an expert at understanding user behavior through their browsing history. You can identify learning patterns, interests, and knowledge progression from web content they've consumed.",
+            role="Friendly Chat Assistant",
+            goal="Respond to the user naturally and conversationally, like a friend who knows what they've been browsing",
+            backstory="You're a casual, friendly AI who has access to the user's browsing history. You chat naturally like a good friend would - not formal or analytical. When they say 'wassup' or 'hey', you respond like a normal person. You can mention their browsing when it's relevant, but keep it conversational and fun.",
             allow_delegation=False,
-            verbose=True,
-            llm=self.llm,
-        )
-
-    @agent
-    def insight_generator_agent(self) -> Agent:
-        return Agent(
-            role="Insight Generator",
-            goal="Generate deep insights and connections between different pieces of browsing memory",
-            backstory="You excel at finding hidden connections between different topics and ideas. You can identify knowledge gaps and suggest logical next steps in a user's learning journey.",
-            allow_delegation=True,
-            verbose=True,
-            llm=self.llm,
-        )
-
-    @agent
-    def response_enhancer_agent(self) -> Agent:
-        return Agent(
-            role="Response Enhancement Specialist",
-            goal="Craft comprehensive, personalized responses that go beyond simple retrieval",
-            backstory="You are skilled at taking raw analysis and insights to create helpful, contextual responses that provide real value to users based on their browsing history and current query.",
-            allow_delegation=False,
-            verbose=True,
+            verbose=False,
             llm=self.llm,
         )
 
     @task
-    def analyze_memory_task(self) -> Task:
+    def chat_response_task(self) -> Task:
         return Task(
-            description="Analyze the provided browser memories to understand patterns, topics, and user interests. Input includes: query={query}, memories={memories}, user_context={user_context}",
-            expected_output="A detailed analysis of browsing patterns, identified topics, learning progression, and key insights about the user's interests and knowledge level.",
-            agent=self.memory_analyst_agent(),
-        )
-
-    @task
-    def generate_insights_task(self) -> Task:
-        return Task(
-            description="Based on the memory analysis, generate deep insights about connections between topics, identify knowledge gaps, and suggest related areas of interest.",
-            expected_output="Comprehensive insights including: topic connections, knowledge progression patterns, identified gaps, and suggested next steps or related topics.",
-            agent=self.insight_generator_agent(),
-        )
-
-    @task
-    def enhance_response_task(self) -> Task:
-        return Task(
-            description="Create an enhanced response that combines the original query answer with the analysis and insights to provide maximum value to the user.",
-            expected_output="A well-structured, comprehensive response that answers the original query while incorporating personalized insights, connections to previous browsing, and actionable suggestions.",
-            agent=self.response_enhancer_agent(),
+            description="""
+            The user said: "{query}"
+            
+            Here's what they've been browsing: {memories}
+            
+            Previous context: {user_context}
+            
+            Respond to them like a friend would. If they're just saying 'wassup', 'hey', or 'hi', respond casually. 
+            You can mention their browsing if it's relevant, but keep it natural and conversational.
+            
+            Examples:
+            - If they say "wassup": "Hey! Not much, just been checking out your browsing. I see you've been diving into some AI stuff - pretty cool! What's up?"
+            - If they ask about something specific: Give them a helpful but casual response
+            - Keep it friendly and natural, not formal or analytical
+            """,
+            expected_output="A casual, friendly chat response that feels like talking to a knowledgeable friend. No formal analysis or structured responses - just natural conversation.",
+            agent=self.conversational_agent(),
         )
 
     @crew
@@ -94,5 +70,5 @@ class BrowserMemoryCrew:
             agents=self.agents,
             tasks=self.tasks,
             process=Process.sequential,
-            verbose=True,
+            verbose=False,
         )

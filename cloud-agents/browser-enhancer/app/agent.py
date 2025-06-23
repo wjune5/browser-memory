@@ -31,13 +31,44 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "test-key")
 
 @tool
 def enhance_memory_response(query: str, memories: str, user_context: str) -> str:
-    """Use this tool to enhance browser memory responses with multi-agent analysis."""
+    """Get conversational context about the user's browsing to help you chat naturally with them."""
     inputs = {
         "query": query, 
         "memories": memories,
         "user_context": user_context
     }
-    return BrowserMemoryCrew().crew().kickoff(inputs=inputs)
+    
+    try:
+        # Get the crew result
+        crew_result = BrowserMemoryCrew().crew().kickoff(inputs=inputs)
+        
+        # Debug: Print the structure we got
+        print(f"DEBUG: CrewOutput type: {type(crew_result)}")
+        print(f"DEBUG: CrewOutput attributes: {[attr for attr in dir(crew_result) if not attr.startswith('_')]}")
+        
+        # The crew_result.raw should contain the final task's output (enhance_response_task)
+        if hasattr(crew_result, 'raw') and crew_result.raw:
+            final_response = crew_result.raw.strip()
+            print(f"DEBUG: Found raw output: {repr(final_response[:200])}...")
+            return final_response
+        
+        # Fallback: Try to get the final task output directly
+        if hasattr(crew_result, 'tasks_output') and crew_result.tasks_output:
+            final_task_output = crew_result.tasks_output[-1]  # Last task should be enhance_response_task
+            if hasattr(final_task_output, 'raw') and final_task_output.raw:
+                final_response = final_task_output.raw.strip()
+                print(f"DEBUG: Found final task output: {repr(final_response[:200])}...")
+                return final_response
+        
+        # Another fallback: Try string conversion
+        final_response = str(crew_result).strip()
+        print(f"DEBUG: Using string conversion: {repr(final_response[:200])}...")
+        return final_response
+        
+    except Exception as e:
+        print(f"DEBUG: Error in crew execution: {e}")
+        # Fallback response
+        return f"Hey! I see you've been browsing some interesting stuff. What's up?"
 
 
 tools = [enhance_memory_response]
@@ -61,14 +92,13 @@ def should_continue(state: MessagesState) -> str:
 def call_model(state: MessagesState, config: RunnableConfig) -> dict[str, BaseMessage]:
     """Calls the language model and returns the response."""
     system_message = (
-        "You are an expert Browser Memory Enhancement Assistant.\n"
-        "Your role is to take pre-filtered browser memories and user queries and enhance "
-        "the response using multi-agent analysis.\n"
-        "You receive queries along with relevant memories that have already been filtered "
-        "by the user's local RAG system.\n"
-        "Your job is to analyze patterns, find connections, and provide enhanced insights "
-        "that go beyond simple retrieval.\n"
-        "Use your memory enhancement tool to coordinate multiple agents for deep analysis."
+        "You are a friendly AI assistant with access to the user's browsing memory.\n"
+        "When the user sends you a message, respond naturally and conversationally, like a friend would.\n"
+        "You can reference things they've been browsing when relevant, but keep it casual and natural.\n\n"
+        "For casual greetings like 'wassup', 'hey', 'hi' - just respond like a normal person would.\n"
+        "Example: If they say 'wassup', you might say 'Hey! Not much, just been checking out your browsing history. I see you've been working on some cool AI stuff. What's up?'\n\n"
+        "Use the memory enhancement tool to get context about their browsing, then respond conversationally.\n"
+        "Don't explain what you're doing - just chat naturally."
     )
 
     messages_with_system = [{"type": "system", "content": system_message}] + state[

@@ -21,11 +21,22 @@ export class ChatManager {
   private sendBtn: HTMLButtonElement | null = null;
   private clearChatBtn: HTMLButtonElement | null = null;
   private updateStatus: (message: string) => void;
+  private showLoadingBar: () => void;
+  private hideLoadingBar: () => void;
+  private updateLoadingText: (text: string) => void;
   private embeddingsService: EmbeddingsService;
   private openai: OpenAI | null = null;
 
-  constructor(updateStatus: (message: string) => void) {
+  constructor(
+    updateStatus: (message: string) => void,
+    showLoadingBar: () => void,
+    hideLoadingBar: () => void,
+    updateLoadingText: (text: string) => void
+  ) {
     this.updateStatus = updateStatus;
+    this.showLoadingBar = showLoadingBar;
+    this.hideLoadingBar = hideLoadingBar;
+    this.updateLoadingText = updateLoadingText;
 
     // Initialize embeddings service with default config
     const embeddingConfig: EmbeddingConfig = {
@@ -225,33 +236,85 @@ export class ChatManager {
         return null;
       }
 
+      // Try to warm up the backend first (quick health check)
+      try {
+        console.log("🌡️ Warming up backend...");
+        this.showLoadingBar();
+        this.updateLoadingText("🌡️ Warming up backend...");
+
+        await fetch(`${settings.backendEndpoint}/health`, {
+          method: "GET",
+          signal: AbortSignal.timeout(5000)
+        });
+        console.log("✅ Backend is warm");
+        this.updateLoadingText("🤖 Processing with multi-agent AI...");
+      } catch (warmupError) {
+        console.log("⚠️ Backend warmup failed, continuing anyway");
+        this.updateLoadingText("🤖 Processing with multi-agent AI...");
+      }
+
       const requestData = {
         query: userMessage,
         relevantMemories: relevantMemories.map((memory) => ({
           title: memory.title || "Untitled",
-          content: memory.content?.substring(0, 500) || "",
+          content: memory.content?.substring(0, 200) || "", // Reduced from 500 to 200 for faster processing
           url: memory.url,
           similarity: memory.similarity || 0
         })),
         userContext: this.getChatContext()
       };
 
-      console.log("🚀 Trying enhanced backend:", settings.backendEndpoint);
+      // Validate userContext format
+      const userContext = this.getChatContext();
+      console.log(
+        "🔍 UserContext type:",
+        typeof userContext,
+        "Array:",
+        Array.isArray(userContext)
+      );
+      console.log("🔍 UserContext content:", userContext);
 
+      console.log("🚀 Trying enhanced backend:", settings.backendEndpoint);
+      console.log("📤 Request data:", JSON.stringify(requestData, null, 2));
+
+      // Show loading bar and update user with status (already shown during warmup)
+      this.updateStatus("🤖 Processing with multi-agent AI...");
+
+      const startTime = Date.now();
       const response = await fetch(`${settings.backendEndpoint}/enhance`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          Accept: "application/json"
         },
         body: JSON.stringify(requestData),
-        signal: AbortSignal.timeout(10000) // 10 second timeout for cloud endpoints
+        signal: AbortSignal.timeout(30000) // Increased to 30 second timeout for multi-agent processing
       });
 
+      const requestTime = Date.now() - startTime;
+      console.log(
+        `📥 Response received in ${requestTime}ms, status:`,
+        response.status
+      );
+
+      // Hide loading bar and update status based on response time
+      this.hideLoadingBar();
+      if (requestTime > 10000) {
+        this.updateStatus("⚡ Enhanced processing complete (slow response)");
+      } else {
+        this.updateStatus("⚡ Enhanced processing complete");
+      }
+
       if (!response.ok) {
-        throw new Error(`Backend responded with ${response.status}`);
+        const errorText = await response.text();
+        console.error("❌ Backend error response:", errorText);
+        throw new Error(
+          `Backend responded with ${response.status}: ${errorText}`
+        );
       }
 
       const data = await response.json();
+      console.log("✅ Backend response data:", data);
 
       if (data.enhancedResponse) {
         // Add insights if available
@@ -270,6 +333,11 @@ export class ChatManager {
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
+      console.error("🔄 Enhanced backend error details:", error);
+
+      // Hide loading bar on error
+      this.hideLoadingBar();
+
       console.log(
         "🔄 Enhanced backend unavailable, using fallback:",
         errorMessage

@@ -28,6 +28,7 @@ const backendEndpointInput = document.getElementById(
 const backendEndpointGroup = document.getElementById(
   "backendEndpointGroup"
 ) as HTMLDivElement;
+const loadingBar = document.getElementById("loadingBar") as HTMLDivElement;
 const status = document.getElementById("status") as HTMLDivElement;
 
 // Chat and UI managers
@@ -42,7 +43,12 @@ document.addEventListener("DOMContentLoaded", () => {
   updateStorageInfo(); // Show storage usage
 
   // Initialize chat functionality
-  chatManager = new ChatManager(updateStatus);
+  chatManager = new ChatManager(
+    updateStatus,
+    showLoadingBar,
+    hideLoadingBar,
+    updateLoadingText
+  );
   chatUI = new ChatUI(updateStatus, () => chatManager.focusChatInput());
 
   chatManager.initializeChat();
@@ -590,4 +596,24 @@ function escapeHtml(text: string): string {
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
+}
+
+// Loading bar functions
+function showLoadingBar(): void {
+  if (loadingBar) {
+    loadingBar.classList.remove("hidden");
+  }
+}
+
+function hideLoadingBar(): void {
+  if (loadingBar) {
+    loadingBar.classList.add("hidden");
+  }
+}
+
+function updateLoadingText(text: string): void {
+  const loadingText = loadingBar?.querySelector(".loading-text");
+  if (loadingText) {
+    loadingText.textContent = text;
+  }
 }

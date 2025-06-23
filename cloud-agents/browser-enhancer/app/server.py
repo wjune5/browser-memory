@@ -137,12 +137,31 @@ async def enhance_browser_memories(request: BrowserMemoryRequest) -> Enhancement
         config = ensure_valid_config(None)
         set_tracing_properties(config)
         
+        # Get the final result from the agent workflow
+        result = agent.invoke(input_chat.model_dump(), config=config)
+        
+        # Extract the final AI response from the LangGraph workflow
         response_content = ""
-        for chunk in agent.stream(input_chat.model_dump(), config=config, stream_mode="values"):
-            if "messages" in chunk:
-                for message in chunk["messages"]:
-                    if hasattr(message, 'content') and message.content:
-                        response_content += message.content
+        if isinstance(result, dict) and "messages" in result:
+            # Get the last AI message that's not a tool call
+            for message in reversed(result["messages"]):
+                if (hasattr(message, 'type') and message.type == 'ai' and 
+                    hasattr(message, 'content') and message.content and 
+                    not (hasattr(message, 'tool_calls') and message.tool_calls)):
+                    response_content = message.content
+                    break
+                elif (isinstance(message, dict) and message.get('type') == 'ai' and 
+                      message.get('content') and not message.get('tool_calls')):
+                    response_content = message['content']
+                    break
+        
+        # Clean response content if needed
+        if response_content:
+            response_content = response_content.strip()
+        
+        # Fallback if no proper response found
+        if not response_content:
+            response_content = f"I can help you understand your browsing patterns. Based on your query '{request.query}' and {len(request.relevantMemories)} relevant memories, I can provide insights about your interests and learning journey."
         
         # Log successful processing
         logger.info({
