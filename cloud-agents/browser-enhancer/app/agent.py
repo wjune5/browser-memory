@@ -18,15 +18,14 @@ import os
 from langchain_core.messages import BaseMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
 from .crew.crew import BrowserMemoryCrew
 
-# Use OpenAI for local testing, Vertex AI for production
-LLM_MODEL = "gpt-3.5-turbo"
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "test-key")
+# Use Gemini 2.5 Flash - completely free!
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 
 @tool
@@ -73,12 +72,11 @@ def enhance_memory_response(query: str, memories: str, user_context: str) -> str
 
 tools = [enhance_memory_response]
 
-# 2. Set up the language model (OpenAI for local testing)
-llm = ChatOpenAI(
-    model=LLM_MODEL, 
-    temperature=0, 
-    max_tokens=4096,
-    openai_api_key=OPENAI_API_KEY
+# 2. Set up the language model (Gemini 2.5 Flash)
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    google_api_key=GEMINI_API_KEY,
+    temperature=0.7
 ).bind_tools(tools)
 
 

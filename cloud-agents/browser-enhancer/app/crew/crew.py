@@ -18,6 +18,10 @@ from typing import Any
 
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+# Set the Google API key for LiteLLM
+os.environ["GOOGLE_API_KEY"] = os.getenv("GEMINI_API_KEY", "")
 
 
 @CrewBase
@@ -27,8 +31,11 @@ class BrowserMemoryCrew:
     agents_config: dict[str, Any]
     tasks_config: dict[str, Any]
 
-    # Use OpenAI for local testing, will switch to Vertex AI for production
-    llm = "gpt-3.5-turbo"
+    @property 
+    def llm(self):
+        # Use LiteLLM format directly - this worked in the earlier successful call
+        # LiteLLM expects provider/model format: gemini/gemini-2.5-flash
+        return "gemini/gemini-2.5-flash"
 
     @agent
     def conversational_agent(self) -> Agent:
