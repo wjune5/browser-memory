@@ -53,6 +53,9 @@
             <button id="saveCurrentPage" class="action-btn">
               💾 Save Current Page
             </button>
+            <button id="autoSaveToggleBtn" class="action-btn">
+              🔄 Auto-Save: <span id="autoSaveStatus">ON</span>
+            </button>
             <button id="clearMemory" class="action-btn secondary">
               🗑️ Clear Memory
             </button>
@@ -102,7 +105,7 @@
 
             <div class="setting-group">
               <label class="toggle-label">
-                <input type="checkbox" id="autoSaveToggle" />
+                <input type="checkbox" id="autoSaveToggle" checked />
                 <span class="toggle-slider"></span>
                 Auto-save pages
               </label>

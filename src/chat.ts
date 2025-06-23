@@ -24,7 +24,7 @@ export class ChatManager {
   private showLoadingBar: () => void;
   private hideLoadingBar: () => void;
   private updateLoadingText: (text: string) => void;
-  private embeddingsService: EmbeddingsService;
+  private embeddingsService: EmbeddingsService | null = null;
   private openai: OpenAI | null = null;
 
   constructor(
@@ -38,14 +38,27 @@ export class ChatManager {
     this.hideLoadingBar = hideLoadingBar;
     this.updateLoadingText = updateLoadingText;
 
-    // Initialize embeddings service with default config
+    // ✅ Don't initialize embeddings service here - do it on demand
+    // This prevents the OpenAI connection error during popup initialization
+  }
+
+  // ✅ Initialize embeddings service on demand with proper API key checking
+  private async getEmbeddingsService(): Promise<EmbeddingsService> {
+    if (this.embeddingsService) return this.embeddingsService;
+
+    // Get current settings to determine which embedding model to use
+    const settings = await chrome.storage.local.get(["settings"]);
+    const apiKey = settings.settings?.apiKey;
+
     const embeddingConfig: EmbeddingConfig = {
-      model: "openai",
-      dimensions: 1536,
+      model: apiKey ? "openai" : "local", // ✅ Use local if no API key
+      dimensions: apiKey ? 1536 : 384,
       maxTokens: 500,
       chunkOverlap: 50
     };
+
     this.embeddingsService = new EmbeddingsService(embeddingConfig);
+    return this.embeddingsService;
   }
 
   // Initialize OpenAI client
@@ -181,7 +194,8 @@ export class ChatManager {
       let relevantMemories: SemanticSearchResult[] = [];
       if (memories.length > 0) {
         try {
-          relevantMemories = await this.embeddingsService.semanticSearch(
+          const embeddingsService = await this.getEmbeddingsService();
+          relevantMemories = await embeddingsService.semanticSearch(
             userMessage,
             memories,
             5 // Get top 5 most relevant memories

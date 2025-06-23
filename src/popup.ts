@@ -18,6 +18,12 @@ const clearMemoryBtn = document.getElementById(
 const autoSaveToggle = document.getElementById(
   "autoSaveToggle"
 ) as HTMLInputElement;
+const autoSaveToggleBtn = document.getElementById(
+  "autoSaveToggleBtn"
+) as HTMLButtonElement;
+const autoSaveStatus = document.getElementById(
+  "autoSaveStatus"
+) as HTMLSpanElement;
 const apiKeyInput = document.getElementById("apiKeyInput") as HTMLInputElement;
 const enhancedBackendToggle = document.getElementById(
   "enhancedBackendToggle"
@@ -66,6 +72,7 @@ searchInput.addEventListener("keypress", (e: KeyboardEvent) => {
 saveCurrentPageBtn.addEventListener("click", saveCurrentPage);
 clearMemoryBtn.addEventListener("click", clearMemory);
 autoSaveToggle.addEventListener("change", handleAutoSaveToggle);
+autoSaveToggleBtn.addEventListener("click", handleAutoSaveButtonToggle);
 apiKeyInput.addEventListener("change", handleApiKeyChange);
 enhancedBackendToggle.addEventListener("change", handleEnhancedBackendToggle);
 backendEndpointInput.addEventListener("change", handleBackendEndpointChange);
@@ -469,6 +476,9 @@ async function loadSettings(): Promise<void> {
     enhancedBackendToggle.checked = settings.useEnhancedBackend || false;
     backendEndpointInput.value = settings.backendEndpoint || "";
 
+    // Update the auto-save button UI to match the checkbox
+    updateAutoSaveUI();
+
     // Show/hide backend endpoint based on toggle
     updateBackendEndpointVisibility();
   } catch (error) {
@@ -477,6 +487,9 @@ async function loadSettings(): Promise<void> {
     apiKeyInput.value = "";
     enhancedBackendToggle.checked = false;
     backendEndpointInput.value = "";
+
+    // Update the auto-save button UI with default value
+    updateAutoSaveUI();
   }
 }
 
@@ -493,11 +506,46 @@ async function handleAutoSaveToggle(): Promise<void> {
       autoSaveToggle.checked ? "Auto-save enabled" : "Auto-save disabled"
     );
 
+    // Update the button UI to match the checkbox
+    updateAutoSaveUI();
+
     // Clear status after 2 seconds
     setTimeout(() => updateStatus("Ready"), 2000);
   } catch (error) {
     console.error("Error updating auto-save setting:", error);
     updateStatus("Failed to update settings");
+  }
+}
+
+async function handleAutoSaveButtonToggle(): Promise<void> {
+  try {
+    const result = await chrome.storage.local.get(["settings"]);
+    const settings = result.settings || {};
+
+    // Toggle the current state
+    settings.autoSave = !settings.autoSave;
+
+    await chrome.storage.local.set({ settings });
+
+    updateStatus(
+      settings.autoSave ? "Auto-save enabled" : "Auto-save disabled"
+    );
+
+    // Update both the checkbox and button UI
+    autoSaveToggle.checked = settings.autoSave;
+    updateAutoSaveUI();
+
+    // Clear status after 2 seconds
+    setTimeout(() => updateStatus("Ready"), 2000);
+  } catch (error) {
+    console.error("Error updating auto-save setting:", error);
+    updateStatus("Failed to update settings");
+  }
+}
+
+function updateAutoSaveUI(): void {
+  if (autoSaveStatus) {
+    autoSaveStatus.textContent = autoSaveToggle.checked ? "ON" : "OFF";
   }
 }
 

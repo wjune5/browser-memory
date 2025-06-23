@@ -26,8 +26,28 @@ export class EmbeddingsService {
       throw new Error("OpenAI API key not configured");
     }
 
+    // ✅ Validate API key format and characters
+    const trimmedApiKey = apiKey.trim();
+    if (!trimmedApiKey) {
+      throw new Error("OpenAI API key is empty");
+    }
+
+    // Check for non-ASCII characters that would cause fetch header errors
+    if (!/^[\x00-\x7F]*$/.test(trimmedApiKey)) {
+      throw new Error(
+        "OpenAI API key contains invalid characters. Please check your API key."
+      );
+    }
+
+    // Basic format validation for OpenAI API keys
+    if (!trimmedApiKey.startsWith("sk-")) {
+      throw new Error(
+        "OpenAI API key must start with 'sk-'. Please check your API key."
+      );
+    }
+
     this.openai = new OpenAI({
-      apiKey: apiKey,
+      apiKey: trimmedApiKey,
       dangerouslyAllowBrowser: true // Required for browser usage
     });
 
@@ -96,8 +116,6 @@ export class EmbeddingsService {
       switch (this.config.model) {
         case "openai":
           return this.generateOpenAIEmbedding(text);
-        case "local":
-          return this.generateLocalEmbedding(text);
         case "cohere":
           return this.generateCohereEmbedding(text);
         default:
@@ -129,34 +147,6 @@ export class EmbeddingsService {
         }`
       );
     }
-  }
-
-  // Local embeddings (simple TF-IDF approximation)
-  private async generateLocalEmbedding(text: string): Promise<number[]> {
-    // Simple local embedding using word frequency
-    // In production, you'd want a proper local model like Sentence Transformers
-    const words = text.toLowerCase().match(/\b\w+\b/g) || [];
-    const wordCounts = new Map<string, number>();
-
-    words.forEach((word) => {
-      wordCounts.set(word, (wordCounts.get(word) || 0) + 1);
-    });
-
-    // Create a simple 384-dimensional vector
-    const dimensions = 384;
-    const embedding = new Array(dimensions).fill(0);
-
-    Array.from(wordCounts.entries()).forEach(([word, count], index) => {
-      const hash = this.simpleHash(word);
-      const position = Math.abs(hash) % dimensions;
-      embedding[position] += count / words.length;
-    });
-
-    // Normalize the vector
-    const magnitude = Math.sqrt(
-      embedding.reduce((sum, val) => sum + val * val, 0)
-    );
-    return embedding.map((val) => (magnitude > 0 ? val / magnitude : 0));
   }
 
   // Cohere embeddings
