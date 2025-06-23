@@ -19,6 +19,15 @@ const autoSaveToggle = document.getElementById(
   "autoSaveToggle"
 ) as HTMLInputElement;
 const apiKeyInput = document.getElementById("apiKeyInput") as HTMLInputElement;
+const enhancedBackendToggle = document.getElementById(
+  "enhancedBackendToggle"
+) as HTMLInputElement;
+const backendEndpointInput = document.getElementById(
+  "backendEndpointInput"
+) as HTMLInputElement;
+const backendEndpointGroup = document.getElementById(
+  "backendEndpointGroup"
+) as HTMLDivElement;
 const status = document.getElementById("status") as HTMLDivElement;
 
 // Chat and UI managers
@@ -52,6 +61,8 @@ saveCurrentPageBtn.addEventListener("click", saveCurrentPage);
 clearMemoryBtn.addEventListener("click", clearMemory);
 autoSaveToggle.addEventListener("change", handleAutoSaveToggle);
 apiKeyInput.addEventListener("change", handleApiKeyChange);
+enhancedBackendToggle.addEventListener("change", handleEnhancedBackendToggle);
+backendEndpointInput.addEventListener("change", handleBackendEndpointChange);
 
 // Search functionality
 async function handleSearch(): Promise<void> {
@@ -68,7 +79,7 @@ async function handleSearch(): Promise<void> {
 
     // Use query rewrite agent to optimize the search query
     const rewrittenQuery = await queryRewriteAgent(originalQuery, apiKey);
-    
+
     console.log(`Original query: "${originalQuery}"`);
     console.log(`Rewritten query: "${rewrittenQuery}"`);
 
@@ -77,10 +88,12 @@ async function handleSearch(): Promise<void> {
     // Use the rewritten query for search
     const results = await searchMemories(rewrittenQuery);
     displaySearchResults(results, originalQuery, rewrittenQuery);
-    
+
     // Show both original and rewritten query in status
     if (originalQuery !== rewrittenQuery) {
-      updateStatus(`Found ${results.length} results (rewritten: "${rewrittenQuery}")`);
+      updateStatus(
+        `Found ${results.length} results (rewritten: "${rewrittenQuery}")`
+      );
     } else {
       updateStatus(`Found ${results.length} results`);
     }
@@ -376,7 +389,11 @@ function displayMemories(memories: Memory[]): void {
     .join("");
 }
 
-function displaySearchResults(results: SearchResult[], originalQuery?: string, rewrittenQuery?: string): void {
+function displaySearchResults(
+  results: SearchResult[],
+  originalQuery?: string,
+  rewrittenQuery?: string
+): void {
   if (results.length === 0) {
     memoryList.innerHTML = '<div class="memory-item">No results found</div>';
     return;
@@ -390,10 +407,14 @@ function displaySearchResults(results: SearchResult[], originalQuery?: string, r
           <strong>Query Rewrite:</strong>
         </div>
         <div style="font-size: 11px; color: #333;">
-          <span style="color: #666;">Original:</span> "${escapeHtml(originalQuery)}"
+          <span style="color: #666;">Original:</span> "${escapeHtml(
+            originalQuery
+          )}"
         </div>
         <div style="font-size: 11px; color: #333;">
-          <span style="color: #007acc;">Rewritten:</span> "${escapeHtml(rewrittenQuery)}"
+          <span style="color: #007acc;">Rewritten:</span> "${escapeHtml(
+            rewrittenQuery
+          )}"
         </div>
       </div>
     `;
@@ -432,13 +453,24 @@ function displayMemoriesHTML(memories: Memory[]): string {
 async function loadSettings(): Promise<void> {
   try {
     const result = await chrome.storage.local.get(["settings"]);
-    const settings = result.settings || { autoSave: true };
+    const settings = result.settings || {
+      autoSave: true,
+      useEnhancedBackend: false,
+      backendEndpoint: ""
+    };
     autoSaveToggle.checked = settings.autoSave;
     apiKeyInput.value = settings.apiKey || "";
+    enhancedBackendToggle.checked = settings.useEnhancedBackend || false;
+    backendEndpointInput.value = settings.backendEndpoint || "";
+
+    // Show/hide backend endpoint based on toggle
+    updateBackendEndpointVisibility();
   } catch (error) {
     console.error("Error loading settings:", error);
     autoSaveToggle.checked = true; // Default to enabled
     apiKeyInput.value = "";
+    enhancedBackendToggle.checked = false;
+    backendEndpointInput.value = "";
   }
 }
 
@@ -483,6 +515,63 @@ async function handleApiKeyChange(): Promise<void> {
   } catch (error) {
     console.error("Error updating API key:", error);
     updateStatus("Failed to save API key");
+  }
+}
+
+async function handleEnhancedBackendToggle(): Promise<void> {
+  try {
+    const result = await chrome.storage.local.get(["settings"]);
+    const settings = result.settings || {};
+
+    settings.useEnhancedBackend = enhancedBackendToggle.checked;
+
+    await chrome.storage.local.set({ settings });
+
+    updateStatus(
+      enhancedBackendToggle.checked
+        ? "Enhanced backend enabled"
+        : "Enhanced backend disabled"
+    );
+
+    // Show/hide endpoint input based on toggle
+    updateBackendEndpointVisibility();
+
+    // Clear status after 2 seconds
+    setTimeout(() => updateStatus("Ready"), 2000);
+  } catch (error) {
+    console.error("Error updating enhanced backend setting:", error);
+    updateStatus("Failed to update settings");
+  }
+}
+
+async function handleBackendEndpointChange(): Promise<void> {
+  try {
+    const result = await chrome.storage.local.get(["settings"]);
+    const settings = result.settings || {};
+
+    settings.backendEndpoint = backendEndpointInput.value.trim();
+
+    await chrome.storage.local.set({ settings });
+
+    if (settings.backendEndpoint) {
+      updateStatus("Backend endpoint saved");
+    } else {
+      updateStatus("Backend endpoint cleared");
+    }
+
+    // Clear status after 2 seconds
+    setTimeout(() => updateStatus("Ready"), 2000);
+  } catch (error) {
+    console.error("Error updating backend endpoint:", error);
+    updateStatus("Failed to save backend endpoint");
+  }
+}
+
+function updateBackendEndpointVisibility(): void {
+  if (enhancedBackendToggle.checked) {
+    backendEndpointGroup.style.display = "block";
+  } else {
+    backendEndpointGroup.style.display = "none";
   }
 }
 

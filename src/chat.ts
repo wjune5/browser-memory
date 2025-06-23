@@ -1,7 +1,11 @@
 // Chat functionality for Browser AI Memory extension
 import OpenAI from "openai";
 import { EmbeddingsService } from "./embeddings";
-import type { EmbeddingConfig, Memory } from "./types/memory";
+import type {
+  EmbeddingConfig,
+  Memory,
+  SemanticSearchResult
+} from "./types/memory";
 
 // Chat state
 export interface ChatMessage {
@@ -151,7 +155,7 @@ export class ChatManager {
     this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
   }
 
-  // Generate AI response using OpenAI with RAG
+  // Generate AI response using smart hybrid approach
   async generateAIResponse(userMessage: string): Promise<string> {
     try {
       console.log("🤖 Generating AI response for:", userMessage);
@@ -162,131 +166,196 @@ export class ChatManager {
 
       console.log("📚 Found", memories.length, "memories for context");
 
-      let contextualInfo = "";
-
-      // Use semantic search to find relevant memories if available
+      // Use semantic search to find relevant memories
+      let relevantMemories: SemanticSearchResult[] = [];
       if (memories.length > 0) {
         try {
-          const relevantMemories = await this.embeddingsService.semanticSearch(
+          relevantMemories = await this.embeddingsService.semanticSearch(
             userMessage,
             memories,
-            20 // Get top 5 most relevant memories
+            5 // Get top 5 most relevant memories
           );
-
           console.log("🔍 Found", relevantMemories.length, "relevant memories");
-
-          if (relevantMemories.length > 0) {
-            contextualInfo =
-              "\n\nRelevant information from your browsing history:\n";
-            relevantMemories.forEach((memory, index) => {
-              contextualInfo += `\n${index + 1}. ${
-                memory.title || "Untitled"
-              }\n`;
-              contextualInfo += `   URL: ${memory.url}\n`;
-              if (memory.content) {
-                // Limit content length to avoid token limits
-                const content =
-                  memory.content.length > 500
-                    ? memory.content.substring(0, 500) + "..."
-                    : memory.content;
-                contextualInfo += `   Content: ${content}\n`;
-              }
-              contextualInfo += `   Similarity: ${(
-                memory.similarity * 100
-              ).toFixed(1)}%\n`;
-            });
-          }
         } catch (searchError) {
-          console.warn(
-            "⚠️ Semantic search failed, using fallback:",
-            searchError
-          );
-          // Fallback: use recent memories if semantic search fails
-          const recentMemories = memories.slice(0, 10);
-          if (recentMemories.length > 0) {
-            contextualInfo = "\n\nRecent browsing history:\n";
-            recentMemories.forEach((memory, index) => {
-              contextualInfo += `\n${index + 1}. ${
-                memory.title || "Untitled"
-              }\n`;
-              contextualInfo += `   URL: ${memory.url}\n`;
-              if (memory.content) {
-                const content =
-                  memory.content.length > 500
-                    ? memory.content.substring(0, 500) + "..."
-                    : memory.content;
-                contextualInfo += `   Content: ${content}\n`;
-              }
-            });
-          }
+          console.warn("⚠️ Semantic search failed:", searchError);
+          // Fallback: use recent memories as SemanticSearchResult
+          relevantMemories = memories.slice(0, 5).map((memory) => ({
+            ...memory,
+            similarity: 0.5 // Default similarity for fallback
+          }));
         }
       }
 
-      // Initialize OpenAI client
-      const openai = await this.initOpenAI();
-
-      // Prepare chat messages with context
-      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-        {
-          role: "system",
-          content: `You are a helpful AI assistant with access to the user's browsing history and saved web content. Use the provided context to give relevant and informed responses. If the context contains relevant information, reference it naturally in your response. If the context isn't relevant, still provide a helpful response based on your general knowledge. No need to ask user about specific timeframe, if user doesn't specify, just return all applied browsing memories.${contextualInfo}`
-        }
-      ];
-
-      // Add recent chat history for context (last 6 messages)
-      const recentHistory = this.chatHistory.slice(-6);
-      recentHistory.forEach((msg) => {
-        messages.push({
-          role: msg.role === "user" ? "user" : "assistant",
-          content: msg.message
-        });
-      });
-
-      // Add current user message
-      messages.push({
-        role: "user",
-        content: userMessage
-      });
-
-      console.log(
-        "📤 Sending request to OpenAI with",
-        messages.length,
-        "messages"
+      // Try enhanced backend first (smart detection)
+      const enhancedResponse = await this.tryEnhancedBackend(
+        userMessage,
+        relevantMemories
       );
+      if (enhancedResponse) {
+        console.log("✅ Using enhanced multi-agent response");
+        return enhancedResponse;
+      }
 
-      // Call OpenAI API
-      const completion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: messages,
-        max_tokens: 1000,
-        temperature: 0.7,
-        stream: false
-      });
-
-      const response =
-        completion.choices[0]?.message?.content ||
-        "I apologize, but I couldn't generate a response. Please try again.";
-
-      console.log("✅ Received AI response, length:", response.length);
-      return response;
+      // Fallback to direct OpenAI with local RAG
+      console.log("📡 Falling back to direct OpenAI");
+      return await this.generateDirectAIResponse(userMessage, relevantMemories);
     } catch (error) {
       console.error("❌ AI response generation failed:", error);
+      return "I encountered an error while generating a response. Please try again.";
+    }
+  }
 
-      if (error instanceof Error) {
-        if (error.message.includes("API key")) {
-          return "Please configure your OpenAI API key in the extension settings to use the chat feature.";
-        } else if (
-          error.message.includes("quota") ||
-          error.message.includes("billing")
-        ) {
-          return "It looks like you've reached your OpenAI API quota or there's a billing issue. Please check your OpenAI account.";
-        } else if (error.message.includes("rate limit")) {
-          return "API rate limit reached. Please wait a moment before sending another message.";
-        }
+  // Try enhanced backend (uses settings configuration)
+  private async tryEnhancedBackend(
+    userMessage: string,
+    relevantMemories: SemanticSearchResult[]
+  ): Promise<string | null> {
+    try {
+      // Check user settings for enhanced backend configuration
+      const result = await chrome.storage.local.get(["settings"]);
+      const settings = result.settings || {};
+
+      if (!settings.useEnhancedBackend) {
+        console.log("🔒 Enhanced backend disabled in settings");
+        return null;
       }
 
-      return "I encountered an error while generating a response. Please try again, and make sure your OpenAI API key is configured correctly.";
+      if (!settings.backendEndpoint) {
+        console.log("⚠️ No backend endpoint configured");
+        return null;
+      }
+
+      const requestData = {
+        query: userMessage,
+        relevantMemories: relevantMemories.map((memory) => ({
+          title: memory.title || "Untitled",
+          content: memory.content?.substring(0, 500) || "",
+          url: memory.url,
+          similarity: memory.similarity || 0
+        })),
+        userContext: this.getChatContext()
+      };
+
+      console.log("🚀 Trying enhanced backend:", settings.backendEndpoint);
+
+      const response = await fetch(`${settings.backendEndpoint}/enhance`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(requestData),
+        signal: AbortSignal.timeout(10000) // 10 second timeout for cloud endpoints
+      });
+
+      if (!response.ok) {
+        throw new Error(`Backend responded with ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.enhancedResponse) {
+        // Add insights if available
+        let finalResponse = data.enhancedResponse;
+        if (data.agentInsights) {
+          finalResponse += `\n\n💡 *Enhanced Analysis: Found ${
+            data.agentInsights.memoriesAnalyzed
+          } relevant memories with ${(
+            data.agentInsights.averageRelevance * 100
+          ).toFixed(0)}% average relevance*`;
+        }
+        return finalResponse;
+      }
+
+      return null;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      console.log(
+        "🔄 Enhanced backend unavailable, using fallback:",
+        errorMessage
+      );
+      return null;
     }
+  }
+
+  // Direct AI response (fallback)
+  private async generateDirectAIResponse(
+    userMessage: string,
+    relevantMemories: SemanticSearchResult[]
+  ): Promise<string> {
+    // Build context from relevant memories
+    let contextualInfo = "";
+    if (relevantMemories.length > 0) {
+      contextualInfo = "\n\nRelevant information from your browsing history:\n";
+      relevantMemories.forEach((memory, index) => {
+        contextualInfo += `\n${index + 1}. ${memory.title || "Untitled"}\n`;
+        contextualInfo += `   URL: ${memory.url}\n`;
+        if (memory.content) {
+          const content =
+            memory.content.length > 500
+              ? memory.content.substring(0, 500) + "..."
+              : memory.content;
+          contextualInfo += `   Content: ${content}\n`;
+        }
+        contextualInfo += `   Similarity: ${(memory.similarity * 100).toFixed(
+          1
+        )}%\n`;
+      });
+    }
+
+    // Initialize OpenAI client
+    const openai = await this.initOpenAI();
+
+    // Prepare chat messages with context
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      {
+        role: "system",
+        content: `You are QuickSeek, a helpful AI assistant with access to the user's browsing history and saved web content. Use the provided context to give relevant and informed responses. If the context contains relevant information, reference it naturally in your response.${contextualInfo}`
+      }
+    ];
+
+    // Add recent chat history for context (last 6 messages)
+    const recentHistory = this.chatHistory.slice(-6);
+    recentHistory.forEach((msg) => {
+      messages.push({
+        role: msg.role === "user" ? "user" : "assistant",
+        content: msg.message
+      });
+    });
+
+    // Add current user message
+    messages.push({
+      role: "user",
+      content: userMessage
+    });
+
+    console.log(
+      "📤 Sending request to OpenAI with",
+      messages.length,
+      "messages"
+    );
+
+    // Call OpenAI API
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: messages,
+      max_tokens: 1000,
+      temperature: 0.7,
+      stream: false
+    });
+
+    const response =
+      completion.choices[0]?.message?.content ||
+      "I apologize, but I couldn't generate a response. Please try again.";
+
+    console.log("✅ Received direct AI response, length:", response.length);
+    return response;
+  }
+
+  // Get chat context for backend
+  private getChatContext(): string[] {
+    const recentHistory = this.chatHistory.slice(-4);
+    return recentHistory.map((msg) => `${msg.role}: ${msg.message}`);
   }
 
   // Clear chat history (start new chat)

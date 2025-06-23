@@ -63,6 +63,9 @@ export interface ExtensionSettings {
   aiProvider: "local" | "openai" | "claude";
   apiKey?: string;
   maxContentLength?: number;
+  // Backend configuration
+  useEnhancedBackend: boolean;
+  backendEndpoint?: string;
 }
 
 export interface StorageData {

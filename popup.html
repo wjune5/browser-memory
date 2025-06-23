@@ -107,6 +107,30 @@
                 Auto-save pages
               </label>
             </div>
+
+            <div class="setting-group">
+              <label class="toggle-label">
+                <input type="checkbox" id="enhancedBackendToggle" />
+                <span class="toggle-slider"></span>
+                Use Enhanced Multi-Agent Backend
+              </label>
+              <small class="help-text"
+                >Enable Google Cloud multi-agent processing</small
+              >
+            </div>
+
+            <div class="setting-group" id="backendEndpointGroup">
+              <label for="backendEndpointInput">Backend Endpoint:</label>
+              <input
+                type="url"
+                id="backendEndpointInput"
+                placeholder="https://your-backend.run.app"
+                class="api-key-input"
+              />
+              <small class="help-text"
+                >Google Cloud Run endpoint for enhanced processing</small
+              >
+            </div>
           </div>
         </div>
       </main>

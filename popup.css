@@ -17,7 +17,7 @@ body {
 .container {
   display: flex;
   flex-direction: column;
-  height: 492px; 
+  height: 492px;
   background: white;
   border-radius: 12px;
   margin: 8px;
@@ -470,6 +470,34 @@ footer {
   background: #667eea;
 }
 
-.setting-group .toggle-label input[type="checkbox"]:checked + .toggle-slider::before {
+.setting-group
+  .toggle-label
+  input[type="checkbox"]:checked
+  + .toggle-slider::before {
   transform: translateX(20px);
+}
+
+/* Backend endpoint group styling */
+#backendEndpointGroup {
+  margin-left: 20px;
+  padding-left: 12px;
+  border-left: 2px solid #e9ecef;
+  transition: opacity 0.3s ease, max-height 0.3s ease;
+  overflow: hidden;
+}
+
+#backendEndpointGroup.hidden {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* Visual hierarchy for enhanced backend settings */
+.setting-group .help-text.enhanced {
+  color: #4a90e2;
+  font-weight: 500;
+}
+
+/* Special styling for URL input */
+input[type="url"] {
+  font-family: monospace;
 }
