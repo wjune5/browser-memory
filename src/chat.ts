@@ -244,7 +244,7 @@ export class ChatManager {
 
         await fetch(`${settings.backendEndpoint}/health`, {
           method: "GET",
-          signal: AbortSignal.timeout(5000)
+          signal: AbortSignal.timeout(30000) // 30 seconds for cold start warmup
         });
         console.log("✅ Backend is warm");
         this.updateLoadingText("🤖 Processing with multi-agent AI...");
@@ -288,7 +288,7 @@ export class ChatManager {
           Accept: "application/json"
         },
         body: JSON.stringify(requestData),
-        signal: AbortSignal.timeout(30000) // Increased to 30 second timeout for multi-agent processing
+        signal: AbortSignal.timeout(300000) // Increased to 5 minute timeout for multi-agent processing
       });
 
       const requestTime = Date.now() - startTime;
@@ -299,7 +299,11 @@ export class ChatManager {
 
       // Hide loading bar and update status based on response time
       this.hideLoadingBar();
-      if (requestTime > 10000) {
+      if (requestTime > 60000) {
+        this.updateStatus(
+          "⚡ Enhanced processing complete (very long processing)"
+        );
+      } else if (requestTime > 10000) {
         this.updateStatus("⚡ Enhanced processing complete (slow response)");
       } else {
         this.updateStatus("⚡ Enhanced processing complete");

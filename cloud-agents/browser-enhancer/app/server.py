@@ -140,26 +140,30 @@ async def enhance_browser_memories(request: BrowserMemoryRequest) -> Enhancement
         # Get the final result from the agent workflow
         result = agent.invoke(input_chat.model_dump(), config=config)
         
-        # Extract the final AI response from the LangGraph workflow
+        # BEST PRACTICE: Extract the final AI response from the LangGraph workflow
+        # LangGraph returns a dict with 'messages' containing the conversation history
         response_content = ""
         if isinstance(result, dict) and "messages" in result:
-            # Get the last AI message that's not a tool call
+            # Iterate through messages in reverse to find the most recent AI response
+            # Skip any messages that are tool calls (we want the final conversational response)
             for message in reversed(result["messages"]):
+                # Handle LangChain message objects
                 if (hasattr(message, 'type') and message.type == 'ai' and 
                     hasattr(message, 'content') and message.content and 
                     not (hasattr(message, 'tool_calls') and message.tool_calls)):
                     response_content = message.content
                     break
+                # Handle dict-based message format
                 elif (isinstance(message, dict) and message.get('type') == 'ai' and 
                       message.get('content') and not message.get('tool_calls')):
                     response_content = message['content']
                     break
         
-        # Clean response content if needed
+        # Clean and validate response content
         if response_content:
             response_content = response_content.strip()
         
-        # Fallback if no proper response found
+        # Graceful fallback if no proper response found
         if not response_content:
             response_content = f"I can help you understand your browsing patterns. Based on your query '{request.query}' and {len(request.relevantMemories)} relevant memories, I can provide insights about your interests and learning journey."
         
@@ -180,7 +184,7 @@ async def enhance_browser_memories(request: BrowserMemoryRequest) -> Enhancement
             },
             processingDetails={
                 "agentType": "multi_agent_crew",
-                "model": "gpt-3.5-turbo", 
+                "model": "gemini-2.5-flash", 
                 "processedAt": "local_testing"
             }
         )

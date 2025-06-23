@@ -62,16 +62,6 @@
         <!-- Chat Mode Section -->
         <div id="chatSection" class="mode-section">
           <div class="chat-section">
-            <!-- Loading Progress Bar -->
-            <div id="loadingBar" class="loading-bar hidden">
-              <div class="loading-progress">
-                <div class="loading-fill"></div>
-              </div>
-              <div class="loading-text">
-                🤖 Processing with multi-agent AI...
-              </div>
-            </div>
-
             <div id="chatMessages" class="chat-messages">
               <!-- Chat messages will be populated here -->
             </div>
@@ -146,6 +136,13 @@
       </main>
 
       <footer>
+        <!-- Unified Status Area with Loading Bar -->
+        <div id="loadingBar" class="loading-bar hidden">
+          <div class="loading-progress">
+            <div class="loading-fill"></div>
+          </div>
+          <div class="loading-text">🤖 Processing with multi-agent AI...</div>
+        </div>
         <div class="status" id="status">Ready</div>
       </footer>
     </div>

@@ -13,7 +13,7 @@ playground:
 
 backend:
 	PROJECT_ID=$$(gcloud config get-value project) && \
-	gcloud run deploy browser-enhancer \
+	gcloud run deploy quickseek-backend \
 		--source . \
 		--memory "4Gi" \
 		--project $$PROJECT_ID \

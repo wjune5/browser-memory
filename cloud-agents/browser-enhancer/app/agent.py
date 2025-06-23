@@ -45,28 +45,30 @@ def enhance_memory_response(query: str, memories: str, user_context: str) -> str
         print(f"DEBUG: CrewOutput type: {type(crew_result)}")
         print(f"DEBUG: CrewOutput attributes: {[attr for attr in dir(crew_result) if not attr.startswith('_')]}")
         
-        # The crew_result.raw should contain the final task's output (enhance_response_task)
+        # BEST PRACTICE 1: Use crew_result.raw for the final output
+        # This is the most direct and reliable approach according to CrewAI docs
         if hasattr(crew_result, 'raw') and crew_result.raw:
             final_response = crew_result.raw.strip()
             print(f"DEBUG: Found raw output: {repr(final_response[:200])}...")
             return final_response
         
-        # Fallback: Try to get the final task output directly
+        # BEST PRACTICE 2: Access the final task's output via tasks_output
+        # This gives us access to the last task's completed output
         if hasattr(crew_result, 'tasks_output') and crew_result.tasks_output:
-            final_task_output = crew_result.tasks_output[-1]  # Last task should be enhance_response_task
+            final_task_output = crew_result.tasks_output[-1]  # Last task in sequence
             if hasattr(final_task_output, 'raw') and final_task_output.raw:
                 final_response = final_task_output.raw.strip()
                 print(f"DEBUG: Found final task output: {repr(final_response[:200])}...")
                 return final_response
         
-        # Another fallback: Try string conversion
+        # FALLBACK 1: Try string conversion (least preferred but functional)
         final_response = str(crew_result).strip()
-        print(f"DEBUG: Using string conversion: {repr(final_response[:200])}...")
+        print(f"DEBUG: Using string conversion fallback: {repr(final_response[:200])}...")
         return final_response
         
     except Exception as e:
         print(f"DEBUG: Error in crew execution: {e}")
-        # Fallback response
+        # Graceful error response
         return f"Hey! I see you've been browsing some interesting stuff. What's up?"
 
 
