@@ -321,16 +321,8 @@ export class ChatManager {
       console.log("✅ Backend response data:", data);
 
       if (data.enhancedResponse) {
-        // Add insights if available
-        let finalResponse = data.enhancedResponse;
-        if (data.agentInsights) {
-          finalResponse += `\n\n💡 *Enhanced Analysis: Found ${
-            data.agentInsights.memoriesAnalyzed
-          } relevant memories with ${(
-            data.agentInsights.averageRelevance * 100
-          ).toFixed(0)}% average relevance*`;
-        }
-        return finalResponse;
+        // Return the clean conversational response directly
+        return data.enhancedResponse;
       }
 
       return null;
